@@ -1,0 +1,9 @@
+venv/
+*.pyc
+__pycache__/
+db.sqlite3
+
+# Ignore the .env file specifically inside the backend folder
+backend/.env
+
+.DS_Store
