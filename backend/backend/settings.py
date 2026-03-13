@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,29 +31,100 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG') == 'True'
 
+CLOUDFLARE_ACCOUNT_ID = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+CLOUDFLARE_API_TOKEN = os.getenv('CLOUDFLARE_API_TOKEN')
+
 ALLOWED_HOSTS = []
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+
+    # Other installed apps
+    'corsheaders',
+    'rest_framework',
+    'django_filters',
+    'rest_framework_simplejwt',
+    
+
+
+
+    # Custom apps
+    'accounts',
+    'games',
+    'streams',
+    'tournaments',
 ]
+
+
+## Make DRF to authenticate only useing JWT Bearer tokens
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES':(
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+
+## Token expiry time
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=10),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=20),
+
+    # The rest may remain default
+}
+
+
+
+## WE USE A CUSTOM EMAIL VERIFICATION TOO SO ADD IT TOO
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend', # THE DEFAULT
+    'accounts.authentication.EmailAuthBackend',  # CUSTOM EMAIL AUTHENTICATION BACKEND
+]
+
+
+## We are going to use customized user model
+AUTH_USER_MODEL = 'accounts.Account'
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # For the js app
+    "http://localhost:5174",  # For ts app
+]
+
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",  # Your JS Frontend
+    "http://localhost:5174",  # Your TS Frontend
+]
+
+
+
 
 ROOT_URLCONF = 'backend.urls'
 
@@ -75,12 +149,31 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+
+
+# Postgresql database
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
     }
 }
+
+
+
+# sqlite3 database
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 
 # Password validation
@@ -117,9 +210,88 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+
+
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
+
+## for media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+
+
+
+
+
+
+JAZZMIN_SETTINGS = {
+    # Title on the login screen
+    "site_header": "Respawn Nation",
+    
+    # Title on the brand (top left)
+    "site_brand": "Respawn Admin",
+    
+    # Welcome text on the login screen
+    "welcome_sign": "Welcome back, Commander",
+    
+    # Copyright on the footer
+    "copyright": "Respawn Nation Ltd",
+
+    # The Model used for the global search bar (top right)
+    "search_model": "accounts.Account",
+
+    # --- SIDEBAR & ICONS ---
+    # This automatically puts these models in the sidebar with icons
+    "icons": {
+        "users.Account": "fas fa-user-shield", # FontAwesome Icon
+        "streams.Stream": "fas fa-video",
+        "games.Game": "fas fa-gamepad",
+    },
+    
+    # --- TOP MENU ---
+    # Links to put in the top bar
+    "topmenu_links": [
+        {"name": "Home",  "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "View Site", "url": "/"},
+    ],
+
+    # --- UI TWEAKS ---
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "changeform_format": "horizontal_tabs", # Tabs for long forms!
+    
+    # Custom CSS/JS (optional, usually not needed)
+    "custom_css": None,
+    "custom_js": None,
+}
+
+# UI TWEAKS (Colors)
+JAZZMIN_UI_TWEAKS = {
+    "theme": "flatly",   # Options: darker, flatly, simplex, spacelab
+    # "dark_mode_theme": "darkly", # Optional: if you want dark mode
+}
+
+
+
+
+# # Add the below if dark mode is what we wanted
+
+# JAZZMIN_UI_TWEAKS = {
+#     "theme": "darkly",  # <--- This activates Dark Mode
+#     "dark_mode_theme": "darkly",
+# }
+
+
