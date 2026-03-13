@@ -1,4 +1,25 @@
+# Python
+*.pyc
+__pycache__/
+
+# Django DB
+backend/db.sqlite3
+
+# Environment variables
+backend/.env
+
+# Media uploads
+backend/media/
+
+# Static files (dev generated)
+backend/static/
+backend/staticfiles/
+
+# Virtual environment
 venv/
+
+# OS
+.DS_Storevenv/
 *.pyc
 __pycache__/
 db.sqlite3
