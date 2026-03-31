@@ -56,5 +56,7 @@ class Games(models.Model):
         options={'quality': 80}
      )
     
+    promo_background = models.ImageField(upload_to='games/promo_bgs/', null= True, blank= True)
+    
     def __str__(self):
         return self.name

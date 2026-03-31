@@ -4,7 +4,14 @@ from rest_framework.decorators import api_view,authentication_classes,permission
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils.text import slugify
+from django.conf import settings
+
+# Google
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests  # import like this to avooid conflicts
 
 # Create your views here.
 
@@ -64,7 +71,7 @@ def login_user(request):
         refresh = RefreshToken.for_user(user)
         return Response({
             'username' : user.username,
-            'accesstoken' : str(refresh.access_token),
+            'access_token' : str(refresh.access_token),
             'refresh_token' : str(refresh)
         },
         status = status.HTTP_200_OK)
@@ -78,3 +85,56 @@ def login_user(request):
 #     "email": "testemail",
 #      "password": "testpassword"
 # }
+
+
+
+#       <--------------Google Login setup------------------->
+
+#  first create a function to generate unique username
+
+def generate_unique_username(base_name):
+    base_name = slugify(base_name)
+    username = base_name
+    counter = 1
+    while User.objects.filter(username = username).exists():
+        username = f"{username}{counter}"    # adds number to last when username already exists
+        counter += 1
+    return username
+
+
+# google login view
+class GoogleLoginView(APIView):
+    def post(self, request):
+        token = request.data.get('token')
+
+        if not token:
+            return Response({'message': 'No token received'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                token,google_requests.Request(),
+                settings.GOOGLE_CLIENT_ID
+            )
+
+            email = idinfo.get('email')
+            name = idinfo.get('name')
+            sub = idinfo.get('sub') # sub is the unique identfier for user
+
+            user, created = User.objects.get_or_create(
+                email = email,
+                defaults = {
+                    'username' : generate_unique_username(name),  # to create a unique username
+                    'first_name' : name
+                }
+            )
+
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'username' : user.username,
+                'access_token' : str(refresh.access_token),
+                'refresh_token' : str(refresh)
+
+            }, status= status.HTTP_200_OK)
+
+        except ValueError:
+            return Response({'message' : 'Invalid token'}, status= status.HTTP_400_BAD_REQUEST)  

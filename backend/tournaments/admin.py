@@ -1,62 +1,144 @@
 from django.contrib import admin
-from django.contrib import messages # Lets us show success/error alerts
+from django.contrib import messages
 from django.utils.safestring import mark_safe
-from django.db.models import F
 from django.utils.html import format_html
 from django.urls import path, reverse
 from django.http import HttpResponseRedirect
 from .models import (
     Tournament, Participant, FootballStanding, 
-    FootballMatch, BattleRoyaleMatch, BattleRoyaleResult
+    FootballMatch, BattleRoyaleMatch, BattleRoyaleResult, TournamentType
 )
-from .services import generate_football_group_stage # Import your new script!
 
+from .engines.factory import get_tournament_engine
+
+admin.site.register(TournamentType)
 
 # 1. THE TOURNAMENT
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
-    # Notice we added 'generate_button' to the display list!
     list_display = ('title', 'game', 'status', 'max_players', 'generate_button')
-    list_filter = ('status', 'game')
+    list_filter = ('status', 'game', 'tournament_type')
     search_fields = ('title',)
 
-    # 1. Create a custom backend URL for the button to point to
+    # =========================================================================
+    # NEW: SMART DROPDOWN FILTERING
+    # =========================================================================
+    def get_form(self, request, obj=None, **kwargs):
+        # 1. Get the default form Django generated
+        form = super().get_form(request, obj, **kwargs)
+        
+        # 2. Check if we are editing an existing tournament (obj exists)
+        if obj:
+            # Filter the dropdowns to ONLY show participants of this specific tournament
+            if 'winner' in form.base_fields:
+                form.base_fields['winner'].queryset = Participant.objects.filter(tournament=obj)
+            if 'runner_up' in form.base_fields:
+                form.base_fields['runner_up'].queryset = Participant.objects.filter(tournament=obj)
+        else:
+            # 3. If creating a brand new tournament, hide all participants 
+            # (Because you can't have a winner for a tournament that hasn't been saved yet)
+            if 'winner' in form.base_fields:
+                form.base_fields['winner'].queryset = Participant.objects.none()
+            if 'runner_up' in form.base_fields:
+                form.base_fields['runner_up'].queryset = Participant.objects.none()
+            
+        return form
+
+    # =========================================================================
+    # EXISTING METHODS
+    # =========================================================================
+
+    # 1. URLs for the Custom Action Buttons
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
             path('<int:tournament_id>/generate/', self.admin_site.admin_view(self.generate_brackets_view), name='generate_brackets'),
+            path('<int:tournament_id>/generate_knockouts/', self.admin_site.admin_view(self.generate_knockouts_view), name='generate_knockouts'),
         ]
         return custom_urls + urls
 
-    # 2. Inject the physical HTML button into the row
+    # 2. The SMART Buttons (Now aware of Engine Types!)
     def generate_button(self, obj):
+        # Safely grab the engine code
+        engine_code = obj.tournament_type.engine_code if obj.tournament_type else None
+
         if obj.status == 'GENERATING':
             url = reverse('admin:generate_brackets', args=[obj.pk])
-            # This creates a nice looking button in the admin panel
+            
+            # Change text based on the format
+            if engine_code == 'world_cup':
+                button_text = 'Generate Groups'
+            elif engine_code == 'battle_royale':
+                button_text = 'Generate Lobbies'
+            else:
+                button_text = 'Generate Matches'
+                
             return format_html(
-                '<a class="button" style="background-color: #417690; color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold;" href="{}">Generate Brackets</a>', 
-                url
+                '<a class="button" style="background-color: #417690; color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold;" href="{}">{}</a>', 
+                url, button_text
             )
-        # If the tournament is Live or Completed, just show a dash
+        
+        elif obj.status == 'LIVE':
+            # World Cup logic requires Knockout checking
+            if engine_code == 'world_cup':
+                if obj.football_matches.filter(stage='KNOCKOUT').exists():
+                    return format_html('<span style="color: green; font-weight: bold;">Knockouts Active</span>')
+                else:
+                    url = reverse('admin:generate_knockouts', args=[obj.pk])
+                    return format_html(
+                        '<a class="button" style="background-color: #ba2121; color: white; padding: 5px 10px; border-radius: 4px; font-weight: bold;" href="{}" ' \
+                        'onclick="return confirm(\'Make sure all group matches are completed. Generate knockouts now?\');">Start Knockouts</a>', 
+                        url
+                    )
+            
+            # Battle Royale has no knockouts, just show Live status
+            elif engine_code == 'battle_royale':
+                return format_html('<span style="color: green; font-weight: bold;">Lobbies Active</span>')
+            
+            else:
+                return format_html('<span style="color: green; font-weight: bold;">Live</span>')
+        
+        elif obj.status == 'COMPLETED':
+            return format_html('<span style="color: goldenrod; font-weight: bold;">🏆 Finished</span>')
+            
         return format_html('<span style="color: gray;">-</span>')
     
-    generate_button.short_description = 'Match Engine' # Column header name
+    generate_button.short_description = 'Match Engine'
 
-    # 3. The engine logic that runs when the button is clicked
+    # 3. Dynamic Initial Match Generation
     def generate_brackets_view(self, request, tournament_id):
         tournament = self.get_object(request, tournament_id)
         
         if tournament.status == 'GENERATING':
             try:
-                generate_football_group_stage(tournament)
-                self.message_user(request, f"Successfully generated brackets for {tournament.title}!", messages.SUCCESS)
+                # Use the factory to run the correct format
+                engine = get_tournament_engine(tournament)
+                engine.generate_initial_matches()
+                
+                self.message_user(request, f"Successfully generated matches for {tournament.title}!", messages.SUCCESS)
             except Exception as e:
-                self.message_user(request, f"Error generating brackets: {str(e)}", messages.ERROR)
+                self.message_user(request, f"Error generating matches: {str(e)}", messages.ERROR)
         
-        # Once done, immediately refresh the page!
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/admin/tournaments/tournament/'))
+
+    # 4. Dynamic Knockout Stage Generation
+    def generate_knockouts_view(self, request, tournament_id):
+        tournament = self.get_object(request, tournament_id)
+        
+        if tournament.status == 'LIVE':
+            try:
+                # Use the factory to run the correct knockout logic
+                engine = get_tournament_engine(tournament)
+                engine.generate_knockouts()
+                
+                self.message_user(request, f"Knockout brackets generated for {tournament.title}!", messages.SUCCESS)
+            except Exception as e:
+                self.message_user(request, f"Error: {str(e)}", messages.ERROR)
+                
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/admin/tournaments/tournament/'))
 
 
+    
 
 
 # 2. THE PARTICIPANTS (The Pool)
@@ -163,15 +245,55 @@ class FootballMatchAdmin(admin.ModelAdmin):
 
 
 
-# 4. BATTLE ROYALE (Using an Inline for the 100 players!)
+
+
+#   <------------------------ BATTLE ROYALE ---------------------------->
+
+# score card
 class BattleRoyaleResultInline(admin.TabularInline):
     model = BattleRoyaleResult
-    extra = 0 # Don't show empty rows by default
+
+    extra = 3     # show only three rows by default because we are only considering only top 3
+    max_num = 3   # makes sure only three is added
+
+    fields = ('rank', 'participant', 'kills')
+    ordering = ('rank',)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'participant':
+            # grab the match id from url
+            match_id = request.resolver_match.kwargs.get('object_id')
+
+            if match_id:
+                # if the match id exists then find the tournament it is connected to
+                match = BattleRoyaleMatch.objects.get(pk = match_id)
+
+                # now filter the dropdown with only the participants available in that tournament
+                kwargs["queryset"] = match.tournament.participants.all()
+
+            else:
+                # if no player was added
+                kwargs["queryset"] = db_field.related_model.objects.none()
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
-
-
+# the match dashboard
 @admin.register(BattleRoyaleMatch)
 class BattleRoyaleMatchAdmin(admin.ModelAdmin):
-    list_display = ('tournament', 'match_number', 'is_completed')
-    inlines = [BattleRoyaleResultInline] # This lets you add player results on the same page as the match!
+    list_display = ('tournament', "match_number", 'is_completed')
+    list_filter = ('tournament', 'is_completed')
+    search_fields = ("tournament__title",)
+
+    # injest top 3 scorecard into match page
+    inlines = [BattleRoyaleResultInline]
+    
+
+
+
+
+
+
+
+
+
