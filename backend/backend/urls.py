@@ -19,6 +19,10 @@ from django.urls import path,include
 from django.conf import settings
 from django.conf.urls.static import static
 
+# To ensure only admin can enter the django admin page
+admin.site.has_permission = lambda request : request.user.is_active and (request.user.is_superuser or request.user.is_staff)
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/accounts/',include('accounts.urls')),

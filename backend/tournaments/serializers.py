@@ -12,19 +12,35 @@ class TournamentSerializer(serializers.ModelSerializer):
     game_name = serializers.CharField(source='game.name', read_only=True)
     winner_name = serializers.CharField(source='winner.user.username', read_only=True, default="TBD")
     current_participants = serializers.IntegerField(source='participants.count', read_only=True)
+    is_registered = serializers.SerializerMethodField()
     
     # The 3 Image Layers
     custom_banner = serializers.SerializerMethodField()
     promo_background = serializers.SerializerMethodField()
     format_overlay = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = Tournament
         fields = [
             'id', 'title', 'status', 'max_players', 'registration_deadline', 
-            'game_name', 'winner_name', 'current_participants',
+            'game_name', 'winner_name', 'current_participants','is_registered',
             'custom_banner', 'promo_background', 'format_overlay'
         ]
+
+
+    # Checks if the user already registered to the tournament
+    def get_is_registered(self,obj):
+        # grab the user making request
+        request = self.context.get('request')
+
+        # if they are logged in, then check did they register to this tournament already
+        if request and request.user.is_authenticated:
+            return Participant.objects.filter(tournament = obj, user = request.user).exists()
+        # if not logged in then they are not considered registered
+        return False
+    
+
 
     # Helper function to safely build image URLs
     def get_absolute_image_url(self, photo):
