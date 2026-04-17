@@ -127,6 +127,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://cloudflare-workers-autoconfig-respawnnation.abhijithms7306.workers.dev",
+    "https://respawn-nation-js.vercel.app/",
 ]
 
 
