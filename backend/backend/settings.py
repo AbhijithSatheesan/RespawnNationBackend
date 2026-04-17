@@ -271,7 +271,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-# Storage settings for cloudinary and staticfiles
+# Slove whitenoise manifest strict issues
+WHITENOISE_MANIFEST_STRICT = False
 
 # Storage settings for cloudinary and staticfiles (Modern Django 4.2+)
 STORAGES = {
@@ -286,6 +287,8 @@ STORAGES = {
 # Legacy variables required by django-cloudinary-storage to prevent collectstatic crash
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+
 
 
 
