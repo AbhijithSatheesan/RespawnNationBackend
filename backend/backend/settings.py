@@ -271,9 +271,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-# Slove whitenoise manifest strict issues
-WHITENOISE_MANIFEST_STRICT = False
-
 # Storage settings for cloudinary and staticfiles (Modern Django 4.2+)
 STORAGES = {
     "default": {
@@ -281,6 +278,9 @@ STORAGES = {
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "OPTIONS": {
+            "manifest_strict": False,  # <--- This tells Whitenoise to ignore missing maps!
+        }
     },
 }
 
