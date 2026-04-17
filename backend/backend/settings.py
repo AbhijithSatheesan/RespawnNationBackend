@@ -122,11 +122,12 @@ MIDDLEWARE = [
 ]
 
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # For the js app
-    "http://localhost:5174",  # For ts app
-]
+# settings.py
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://cloudflare-workers-autoconfig-respawnnation.abhijithms7306.workers.dev",
+]
 
 
 CSRF_TRUSTED_ORIGINS = [
