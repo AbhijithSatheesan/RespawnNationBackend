@@ -271,18 +271,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-# Modern Django Storage setup
+# Modern Django Storage setup (No Whitenoise processing, let Cloudflare handle compression)
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage", # <-- Removed "Manifest"
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage", # <-- Native Django Storage
     },
 }
 
 # Legacy variables required by django-cloudinary-storage
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage' # <-- Removed "Manifest"
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
