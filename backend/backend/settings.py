@@ -273,6 +273,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Storage settings for cloudinary and staticfiles
 
+# Storage settings for cloudinary and staticfiles (Modern Django 4.2+)
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
@@ -282,6 +283,9 @@ STORAGES = {
     },
 }
 
+# Legacy variables required by django-cloudinary-storage to prevent collectstatic crash
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 
