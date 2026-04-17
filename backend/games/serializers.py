@@ -16,9 +16,9 @@ class GameCardSerializer(serializers.ModelSerializer):
             return None
 
         return {
-            "small": obj.cover_small.url,
-            "medium": obj.cover_medium.url,
-            "large": obj.cover_large.url,
+            "medium": obj.cover_image.url,
+            "small": obj.cover_image.url, 
+            "large": obj.cover_image.url,
         }
 
 

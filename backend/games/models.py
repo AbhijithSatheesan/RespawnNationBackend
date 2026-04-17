@@ -35,26 +35,26 @@ class Games(models.Model):
     # the cover image should be resized according to screen size
     cover_image = models.ImageField( upload_to='games/',null = True, blank = True)
 
-    cover_small = ImageSpecField(
-        source='cover_image',
-        processors=[ResizeToFill(400, 600)],
-        format='WEBP',
-        options={'quality': 60}
-     )
+    # cover_small = ImageSpecField(
+    #     source='cover_image',
+    #     processors=[ResizeToFill(400, 600)],
+    #     format='WEBP',
+    #     options={'quality': 60}
+    #  )
     
-    cover_medium = ImageSpecField(
-        source='cover_image',
-        processors=[ResizeToFill(800, 1200)],
-        format='WEBP',
-        options={'quality': 70}
-     )
+    # cover_medium = ImageSpecField(
+    #     source='cover_image',
+    #     processors=[ResizeToFill(800, 1200)],
+    #     format='WEBP',
+    #     options={'quality': 70}
+    #  )
     
-    cover_large = ImageSpecField(
-        source='cover_image',
-        processors=[ResizeToFill(1600, 2400)],
-        format='WEBP',
-        options={'quality': 80}
-     )
+    # cover_large = ImageSpecField(
+    #     source='cover_image',
+    #     processors=[ResizeToFill(1600, 2400)],
+    #     format='WEBP',
+    #     options={'quality': 80}
+    #  )
     
     promo_background = models.ImageField(upload_to='games/promo_bgs/', null= True, blank= True)
     

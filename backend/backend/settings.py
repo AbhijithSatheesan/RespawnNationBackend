@@ -54,7 +54,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary',
 
 
     # Other installed apps
@@ -160,6 +162,8 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 
 
+# Supabase + local django database
+
 # Check if SUPABASE_URL exists in the .env file
 if os.getenv('SUPABASE_URL'):
     DATABASES = {
@@ -178,7 +182,11 @@ else:
         }
     }
 
-# Postgresql database
+
+
+
+
+# # Postgresql database
 
 # DATABASES = {
 #     'default': {
@@ -190,6 +198,17 @@ else:
 #         'PORT': os.getenv('DB_PORT'),
 #     }
 # }
+
+
+
+# Cloudinary storage config
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+}
+
 
 
 
@@ -252,8 +271,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
+# Storage settings for cloudinary and staticfiles
 
-
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 
@@ -298,6 +325,9 @@ JAZZMIN_SETTINGS = {
     "custom_css": None,
     "custom_js": None,
 }
+
+
+
 
 # UI TWEAKS (Colors)
 JAZZMIN_UI_TWEAKS = {
