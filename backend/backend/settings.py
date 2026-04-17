@@ -271,23 +271,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-# Storage settings for cloudinary and staticfiles (Modern Django 4.2+)
+# Turn off strict mode for missing map files globally
+WHITENOISE_MANIFEST_STRICT = False
+
+# Modern Django Storage setup (No OPTIONS dict inside)
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-        "OPTIONS": {
-            "manifest_strict": False,  # <--- This tells Whitenoise to ignore missing maps!
-        }
     },
 }
 
-# Legacy variables required by django-cloudinary-storage to prevent collectstatic crash
+# Legacy variables required by django-cloudinary-storage to prevent crashes
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
 
 
 
