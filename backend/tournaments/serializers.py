@@ -14,34 +14,33 @@ class TournamentSerializer(serializers.ModelSerializer):
     current_participants = serializers.IntegerField(source='participants.count', read_only=True)
     is_registered = serializers.SerializerMethodField()
     
+    # FIX: Change this to a SerializerMethodField
+    current_prize_pool = serializers.SerializerMethodField()
+    
     # The 3 Image Layers
     custom_banner = serializers.SerializerMethodField()
     promo_background = serializers.SerializerMethodField()
     format_overlay = serializers.SerializerMethodField()
     
-
     class Meta:
         model = Tournament
         fields = [
             'id', 'title', 'status', 'max_players', 'registration_deadline', 
             'game_name', 'winner_name', 'current_participants','is_registered',
-            'custom_banner', 'promo_background', 'format_overlay'
+            'custom_banner', 'promo_background', 'format_overlay', 'entry_fee', 'current_prize_pool'
         ]
 
+    # FIX: Manually grab the property and force it into a JSON-safe float
+    def get_current_prize_pool(self, obj):
+        return float(obj.current_prize_pool)
 
     # Checks if the user already registered to the tournament
-    def get_is_registered(self,obj):
-        # grab the user making request
+    def get_is_registered(self, obj):
         request = self.context.get('request')
-
-        # if they are logged in, then check did they register to this tournament already
         if request and request.user.is_authenticated:
-            return Participant.objects.filter(tournament = obj, user = request.user).exists()
-        # if not logged in then they are not considered registered
+            return Participant.objects.filter(tournament=obj, user=request.user).exists()
         return False
     
-
-
     # Helper function to safely build image URLs
     def get_absolute_image_url(self, photo):
         if not photo: return None
@@ -55,8 +54,9 @@ class TournamentSerializer(serializers.ModelSerializer):
     def get_promo_background(self, obj):
         if obj.game and obj.game.promo_background:
             return self.get_absolute_image_url(obj.game.promo_background)
-        elif obj.game and hasattr(obj.game, 'cover_medium') and obj.game.cover_medium:
-            return self.get_absolute_image_url(obj.game.cover_medium)
+        # Safely handling ImageKit fields if they exist
+        elif obj.game and hasattr(obj.game, 'cover_image') and obj.game.cover_image:
+            return self.get_absolute_image_url(obj.game.cover_image)
         return None
 
     def get_format_overlay(self, obj):
@@ -169,3 +169,7 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
             ]
             return leaderboard
         return []
+    
+
+
+    

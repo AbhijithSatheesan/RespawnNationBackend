@@ -22,14 +22,15 @@ class GameCardSerializer(serializers.ModelSerializer):
         }
 
 
- # This provides all details about game, 
 class GamesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Games
-        fields = ['id', 'name', 'description', 'cover_image', 'tags', 'rating', 'developer', 'publisher', 'price', 'trailer_1']
-
-
-
+        fields = [
+            'id', 'name', 'description', 'release_year', 'cover_image', 
+            'promo_background', 'tags', 'rating', 'developer', 'publisher', 
+            'price', 'trailer_1', 'trailer_2', 
+            'action', 'graphics', 'story', 'gameplay'
+        ]
 
 
 

@@ -1,4 +1,5 @@
 from django.db import models
+from decimal import Decimal
 from django.db.models import Sum
 from games.models import Games
 
@@ -38,8 +39,31 @@ class Tournament(models.Model):
     registration_deadline = models.DateTimeField()
     winner = models.ForeignKey('Participant', related_name= 'tournaments_won', on_delete= models.SET_NULL, null= True, blank= True )
     runner_up = models.ForeignKey('Participant', related_name= 'tournaments_runner_up', on_delete= models.SET_NULL, null= True, blank= True)
-
     custom_banner = models.ImageField(upload_to='tournaments/custom_banner', null= True, blank= True)
+
+    entry_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0.00, help_text="Entry fee in INR")
+    base_prize_pool = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Starting guaranteed prize money")
+    platform_cut_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Percentage of fee kept by the platform (e.g., 20.00)")
+
+
+    @property
+    def current_prize_pool(self):
+        """
+        calculates current prizepool dynamically
+            base prize + (number of participants * (entree fee - platform fee))
+        """
+
+        participant_count = self.participants.count()
+
+        if self.entry_fee == 0:
+            return self.base_prize_pool
+        
+        cut_multiplier = Decimal(1) - (self.platform_cut_percentage / Decimal(100))
+        contribution_per_player = self.entry_fee * cut_multiplier
+
+        # now add the contribution of the player to prize pool
+        total_prize = self.base_prize_pool + (Decimal(participant_count) * contribution_per_player)
+        return round(total_prize, 2)
 
     def __str__(self):
         return self.title
@@ -58,10 +82,31 @@ class Participant(models.Model):
     
     class Meta:
         # Prevents a user from joining the same tournament twice
-        unique_together = ('user', 'tournament')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tournament','user'],
+                name= 'unique_tournament_user'
+            )
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.tournament.title}"
+    
+
+
+
+class Order(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    tournament = models.ForeignKey('Tournament', on_delete=models.CASCADE)
+    razorpay_order_id = models.CharField(max_length=255, unique=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    is_paid = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.tournament.title} - {self.razorpay_order_id}"
+
+
 
 
 # ==========================================
@@ -106,6 +151,10 @@ class FootballMatch(models.Model):
     # The two players facing off
     player_1 = models.ForeignKey(Participant, related_name='matches_as_p1', null=True, blank=True, on_delete=models.SET_NULL)
     player_2 = models.ForeignKey(Participant, related_name='matches_as_p2', null=True, blank=True, on_delete=models.SET_NULL)
+
+    # Upload screenshot of scores
+    player_1_proof = models.ImageField(upload_to='matches/proof', null= True, blank=True)
+    player_2_proof = models.ImageField(upload_to='matches/proof', null= True, blank= True)
     
     # The result
     p1_score = models.IntegerField(default=0, null=True, blank=True)

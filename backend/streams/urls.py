@@ -9,5 +9,6 @@ urlpatterns = [
     path("live/", LiveStreamsListView.as_view()),
     path("<int:pk>/", StreamDetailVeiw.as_view()),
     path('my-stream/update/', UpdateStreamView.as_view(), name='update-stream'),
+    path('game/<int:game_id>/', game_streams, name= 'game-streams')
     
 ]

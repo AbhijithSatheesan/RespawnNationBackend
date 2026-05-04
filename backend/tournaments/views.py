@@ -1,14 +1,17 @@
 import razorpay
 from django.conf import settings
-from django.db import transaction
-from rest_framework.permissions import IsAuthenticated
+import uuid
+from django.db import transaction, IntegrityError
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view,permission_classes
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.pagination import PageNumberPagination
-from .models import Tournament,Participant
+from decimal import Decimal
+from .models import Tournament,Participant,Order
 from .serializers import TournamentSerializer, TournamentDetailSerializer
 
 # 1. Create a custom Pagination class for your Tournaments
@@ -56,20 +59,41 @@ class GenerateOrderView(APIView):
         # before letting them pay, we should check some basic checks in tournament
         if tournament.status != 'REGISTRATION':
             return Response({'error': 'Registration closed'}, status= status.HTTP_400_BAD_REQUEST)
+        
         if tournament.participants.count() >= tournament.max_players:
             return Response({'error': 'Tournament is full'}, status= status.HTTP_400_BAD_REQUEST)
         
+        # stop duplicate payments before order is even created
+        if Participant.objects.filter(tournament = tournament, user = request.user).exists():
+            return Response({'error': 'You already registerd for this tournament'}, status= status.HTTP_400_BAD_REQUEST)
+        
+
+        # check whether tournament has entry fee
+        if tournament.entry_fee == Decimal('0.00'):
+            return Response({'error': 'This is a free tournament, no payment required.'}, status = status.HTTP_400_BAD_REQUEST)
+        
         # now create the order, razorpay requires the lowest metric of a currency
-        amount_in_paise = 50000
+        amount_in_paise = int(tournament.entry_fee * 100)
+
+        unique_recipt = f"tourney_{tournament.id}_user_{request.user.id}_{uuid.uuid4().hex[:6]}"
 
         try:
             razorpay_order = razorpay_client.order.create({
                 'amount': amount_in_paise,
                 'currency': 'INR',
-                'receipt' : f"tourney_{tournament.id}_user_{request.user.id}",
+                'receipt' : unique_recipt,
                 'payment_capture' : '1'  # Let the money to be captured by razorpay right after user enters pin, if 0 instead of 1
                                          #    then money will be held by bank until i captures it
             })
+
+            # Also save the order to our database
+            Order.objects.create(
+                user = request.user,
+                tournament = tournament,
+                razorpay_order_id = razorpay_order['id'],
+                amount = int(tournament.entry_fee * 100)
+            )
+
 
             # now send ordera_id back to react
             return Response({
@@ -88,39 +112,116 @@ class GenerateOrderView(APIView):
 class RegisterTournamentView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @transaction.atomic  # Either everything inside this will complete or nothing will complete
+    @transaction.atomic
     def post(self, request, pk):
-        # grab the data react sent to us after a successfull payment
+        game_id = request.data.get('game_id')
+
+        # first lock a row in tournament to check availability safely
+        tournament = get_object_or_404(Tournament.objects.select_for_update(), pk = pk)
+
+        # check for double entry
+        if Participant.objects.filter(tournament = tournament, user = request.user).exists():
+            return Response({'error': 'Already registered for this tournament'}, status= status.HTTP_400_BAD_REQUEST)
+        
+
+        # --> 1. If tournament is free
+        if tournament.entry_fee == Decimal('0.00'):
+            if tournament.participants.count() >= tournament.max_players:
+                return Response({'error': 'Tournament is full'}, status= status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                # Register them instantly if slot is available
+                Participant.objects.create(tournament = tournament, user= request.user, game_id = game_id)
+                return Response({
+                    'message': 'Successfully registered for tournament',
+                    'new_prize_pool' : tournament.current_prize_pool
+                }, status= status.HTTP_201_CREATED)
+            except IntegrityError:
+                return Response({'error': 'You already Registered'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # --> 2. If tournament is paid
         razorpay_payment_id = request.data.get('razorpay_payment_id')
         razorpay_order_id = request.data.get('razorpay_order_id')
         razorpay_signature = request.data.get('razorpay_signature')
-        game_id = request.data.get('game_id') # user's game id
 
+        # check does the react do sends payment data
+        if not all ([razorpay_payment_id, razorpay_order_id, razorpay_signature]):
+            return Response({'error': 'missing payment data'}, status= status.HTTP_400_BAD_REQUEST)
+        
         try:
             razorpay_client.utility.verify_payment_signature({
-                'razorpay_payment_id': razorpay_payment_id,
+                'razorpay_payment_id' : razorpay_payment_id,
                 'razorpay_order_id' : razorpay_order_id,
                 'razorpay_signature' : razorpay_signature
             })
+
         except razorpay.errors.SignatureVerificationError:
-            return Response({'error': 'Invalid payment Signature.'}, status= status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid Payment Signature'}, status= status.HTTP_400_BAD_REQUEST)
         
-        # Lock the tournament row to check availability safely
-        tournament = get_object_or_404(Tournament.objects.select_for_update(), pk = pk)
 
-        # if the slots got filled while paying, refund the money automatically
+
+        # Order validation from Database
+        try:
+            db_order = Order.objects.get(razorpay_order_id = razorpay_order_id)
+
+            # make sure this order belongs to the same user and tournament
+            if db_order.user != request.user or db_order.tournament != tournament:
+                return Response({'error': 'Cross Payment tampering detected'}, status= status.HTTP_403_FORBIDDEN)
+            
+            # Preventing cheap order swaping
+            if db_order.amount != tournament.entry_fee:
+                return Response({'error': 'Payment amount mismatch detected'}, status= status.HTTP_400_BAD_REQUEST)
+            
+            # Check if they are using already paid order's id, prevent double use
+            if db_order.is_paid:
+                return Response({'error': 'This order has already been processed'}, status= status.HTTP_400_BAD_REQUEST)
+
+            
+        except Order.DoesNotExist:
+            return Response({'error':'Order not found in our records'}, status= status.HTTP_404_NOT_FOUND)
+        
+        # Check the payment is captured ?
+        try:
+            payment_details = razorpay_client.payment.fetch(razorpay_payment_id)
+            if payment_details['status'] != 'captured':
+                return Response({'error':'Payment has not been captured by bank'}, status= status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            return Response({'error':'could not verify payment details with razorpay'}, status= status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Refund if slots gets filled up in between process
         if tournament.participants.count() >= tournament.max_players:
-            razorpay_client.payment.refund(razorpay_payment_id,{'amount': 50000})
-            return Response({'error': 'Oops tournament filled up, you have been refunded. A new tournament will be open soon 🫡'}, status= status.HTTP_400_BAD_REQUEST)
+            refund_amount = int(tournament.entry_fee * 100)
+            razorpay_client.payment.refund(razorpay_payment_id, {'amount': refund_amount})
+            return Response({
+                'error': 'Oops, Tournament filled up, You have been refunded! A new tournament will be open soon 🫡'
+                }, status= status.HTTP_400_BAD_REQUEST)
+                
         
-        # if slots are available, then jsut add the participant to tournament
-        participant = Participant.objects.create(
-            tournament = tournament,
-            user = request.user,
-            game_id = game_id
-        )
+        try:
+            # if everything is okay, then register the paying user
+            Participant.objects.create(tournament= tournament, user = request.user, game_id = game_id)
+            db_order.is_paid = True
+            db_order.save()
 
-        return Response({'message': 'Successfully joined tournament'}, status= status.HTTP_201_CREATED)
-
+            return Response({
+                'message':'Payment Successfull, joined tournament',
+                'new_prize_pool' : tournament.current_prize_pool
+            }, status= status.HTTP_201_CREATED)
+        
+        except IntegrityError:
+            # if this block is hit, it means user paid but db rejected the duplicate entry
+            refund_amount = int(tournament.entry_fee * 100)
+            razorpay_client.payment.refund(razorpay_payment_id, {'amount': refund_amount})
+            return Response({'error':'You are already registered. Your duplicate payment has been refunded'}, status= status.HTTP_400_BAD_REQUEST)
         
 
+
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def game_tournaments(request, game_id):
+    tournaments = Tournament.objects.filter(game_id = game_id).order_by('-created_at')
+    serializer = TournamentSerializer(tournaments, many = True, context = {'request': request})
+    return Response(serializer.data)

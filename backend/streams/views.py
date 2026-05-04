@@ -2,19 +2,15 @@ import requests
 from django.shortcuts import render
 from django.conf import settings
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, generics, permissions
+from .models import Stream, Games
+from .serializers import StreamOwnerSerializer, StreamUpdateSerializer, StreamPublicSerializer
+from django.db.models import Q
 
-from .models import Stream
-from .serializers import (
-    StreamPublicSerializer,
-    StreamOwnerSerializer,
-)
-
-
-# Create your views here.
 
 
 # view for going live 
@@ -98,15 +94,6 @@ class CreateStreamVIew(APIView):
 
 
 
-# streams/views.py
-import requests # Ensure this is imported
-from django.conf import settings
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from .models import Stream
-from .serializers import StreamOwnerSerializer
 
 class RegenerateStreamKeyView(APIView):
     permission_classes = [IsAuthenticated]
@@ -198,11 +185,6 @@ class StreamDetailVeiw(RetrieveAPIView):
 
 
 
-from rest_framework import generics, status, permissions
-from rest_framework.response import Response
-from django.db.models import Q
-from .models import Stream, Games
-from .serializers import StreamUpdateSerializer 
 
 # --- EXISTING VIEWS (Create, Get, etc.) WOULD BE HERE ---
 
@@ -215,3 +197,12 @@ class UpdateStreamView(generics.UpdateAPIView):
         # Ensure user can only update their OWN stream
         return Stream.objects.get(user=self.request.user)
 
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def game_streams(request, game_id):
+    # Only fetch streams that are currently LIVE for this specific game
+    streams = Stream.objects.filter(game_id=game_id, is_live=True).order_by('-created_at')
+    serializer = StreamPublicSerializer(streams, many=True)
+    return Response(serializer.data)

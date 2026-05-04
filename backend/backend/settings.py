@@ -122,13 +122,13 @@ MIDDLEWARE = [
 ]
 
 
-# settings.py
+
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://cloudflare-workers-autoconfig-respawnnation.abhijithms7306.workers.dev",
-    "https://respawn-nation-js.vercel.app/",
-    "https://respawnnation.pages.dev/",
+    "https://respawn-nation-js.vercel.app",
+    "https://respawnnation.pages.dev",
 ]
 
 
@@ -158,6 +158,12 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+
+
+
+
+
+
 
 
 # Database
@@ -204,6 +210,17 @@ else:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 # Cloudinary storage config
 
 CLOUDINARY_STORAGE = {
@@ -211,9 +228,6 @@ CLOUDINARY_STORAGE = {
     'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 }
-
-
-
 
 
 # Password validation

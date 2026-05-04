@@ -5,7 +5,8 @@ from .models import Stream, Games
 # The serializer which shows to viewrs
 class StreamPublicSerializer(serializers.ModelSerializer):
     hls_url = serializers.ReadOnlyField()
-
+    # Grab the username from the related User model
+    streamer_name = serializers.CharField(source='user.username', read_only=True)
 
     class Meta:
         model = Stream
@@ -16,6 +17,7 @@ class StreamPublicSerializer(serializers.ModelSerializer):
             'is_live',
             'playback_id',
             'hls_url',
+            'streamer_name',
         ]
 
 
