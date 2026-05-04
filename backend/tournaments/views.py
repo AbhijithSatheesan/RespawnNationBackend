@@ -169,7 +169,7 @@ class RegisterTournamentView(APIView):
                 return Response({'error': 'Cross Payment tampering detected'}, status= status.HTTP_403_FORBIDDEN)
             
             # Preventing cheap order swaping
-            if db_order.amount != tournament.entry_fee:
+            if db_order.amount != tournament.entry_fee * 100:
                 return Response({'error': 'Payment amount mismatch detected'}, status= status.HTTP_400_BAD_REQUEST)
             
             # Check if they are using already paid order's id, prevent double use
