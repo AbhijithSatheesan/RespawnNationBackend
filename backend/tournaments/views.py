@@ -24,6 +24,7 @@ class StandardResultsSetPagination(PageNumberPagination):
     max_page_size = 50
 
 class TournamentListView(generics.ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = TournamentSerializer
     pagination_class = StandardResultsSetPagination # 2. Tell the view to use it
 
@@ -146,7 +147,7 @@ class RegisterTournamentView(APIView):
             
 
         # PAY USING WALLET ---------------------------------
-        
+
         if payment_method == 'WALLET':
             if tournament.participants.count() >= tournament.max_players:
                 return Response({'error': 'Tournament is full'}, status=status.HTTP_400_BAD_REQUEST)

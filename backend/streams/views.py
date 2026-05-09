@@ -169,6 +169,7 @@ class RegenerateStreamKeyView(APIView):
 
 # veiw for seeing list of streams
 class LiveStreamsListView(ListAPIView):
+    permission_classes = [AllowAny]
     queryset = Stream.objects.filter(is_live = True)
     serializer_class = StreamPublicSerializer
 
