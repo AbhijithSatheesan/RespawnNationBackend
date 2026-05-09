@@ -6,4 +6,4 @@ class TournamentsConfig(AppConfig):
 
     # ADD THIS TO TURN ON YOUR SIGNALS
     def ready(self):
-        import tournaments.signals # Change 'tournaments' to your actual app name if different
+        import tournaments.signals

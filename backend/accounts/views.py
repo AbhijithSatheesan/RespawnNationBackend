@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.text import slugify
 from django.conf import settings
+from rest_framework.permissions import IsAuthenticated
+from .serializers import UserProfileSerializer
 
 # Google
 from google.oauth2 import id_token
@@ -16,6 +18,29 @@ from google.auth.transport import requests as google_requests  # import like thi
 # Create your views here.
 
 User = get_user_model()
+
+
+
+
+
+
+
+class MyProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get the profile of the currently logged-in user
+        profile = request.user.profile 
+        serializer = UserProfileSerializer(profile, context={'request': request})
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
 
 
 ## Normal Register Veiw
@@ -138,3 +163,9 @@ class GoogleLoginView(APIView):
 
         except ValueError:
             return Response({'message' : 'Invalid token'}, status= status.HTTP_400_BAD_REQUEST)  
+        
+
+
+
+
+

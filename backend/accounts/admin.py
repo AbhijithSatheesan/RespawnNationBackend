@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
-from .models import Account
+from .models import *
 
 class AccountAdmin(UserAdmin):
     list_display = ('display_avatar', 'username', 'email', 'id', 'is_active')
@@ -24,3 +24,10 @@ class AccountAdmin(UserAdmin):
     display_avatar.short_description = "Avatar"
 
 admin.site.register(Account, AccountAdmin)
+
+
+
+
+admin.site.register(UserProfile)
+admin.site.register(PlayerGameID)
+admin.site.register(WalletTransaction)
