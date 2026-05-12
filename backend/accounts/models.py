@@ -60,6 +60,8 @@ class WalletTransaction(models.Model):
     TRANSACTION_TYPES = [
         ('DEPOSIT', 'Added Funds'),
         ('WITHDRAWAL', 'Cashed Out'),
+        ('WITHDRAWAL_PENDING', 'Withdrawal Requested'),
+        ('WITHDRAWAL_REJECTED', 'Withdrawal Refunded'),
         ('ENTRY_FEE', 'Tournament Entry Fee'),
         ('PRIZE', 'Prize Money Won'),
         ('REFUND', 'Tournament Refund')
@@ -81,3 +83,30 @@ class WalletTransaction(models.Model):
     def __str__(self):
         sign = "+" if self.transaction_type in ['DEPOSIT', 'PRIZE', 'REFUND'] else "-"
         return f"{self.user.username} | {self.get_transaction_type_display()} | {sign}₹{self.amount}"
+    
+
+
+#  <---------  Withdraw money -------------->
+
+class WithdrawalRequest(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Approval'),
+        ('COMPLETED', 'Completed'),
+        ('REJECTED', 'Rejected / Refunded'),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete= models.CASCADE, related_name='withdrawals')
+    amount = models.DecimalField(max_digits= 10, decimal_places= 2)
+    upi_id = models.CharField(max_length= 100, help_text="User's upi id for cash transfer")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default= "PENDING")
+
+    # If admin wants to give a message back
+    admin_note = models.TextField(blank= True, null= True)
+
+    created_at = models.DateTimeField(auto_now_add= True)
+    processed_at = models.DateTimeField(blank= True, null= True)
+
+    def __str__(self):
+        return f"{self.user.username} - ₹{self.amount} ({self.status})"
+
+        
