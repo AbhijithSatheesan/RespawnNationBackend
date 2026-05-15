@@ -44,6 +44,7 @@ class Tournament(models.Model):
     entry_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0.00, help_text="Entry fee in INR")
     base_prize_pool = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Starting guaranteed prize money")
     platform_cut_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Percentage of fee kept by the platform (e.g., 20.00)")
+    prizes_distributed = models.BooleanField(default= False)
 
 
     @property

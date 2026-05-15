@@ -74,6 +74,9 @@ class WalletTransaction(models.Model):
     
     # Optional link to the tournament (if it was an entry fee or prize)
     tournament = models.ForeignKey('tournaments.Tournament', on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Link to Withdrawal request
+    withdrawal_request = models.ForeignKey('WithdrawalRequest', on_delete=models.SET_NULL, null= True, blank= True, related_name='ledger_entries')
     
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -84,6 +87,23 @@ class WalletTransaction(models.Model):
         sign = "+" if self.transaction_type in ['DEPOSIT', 'PRIZE', 'REFUND'] else "-"
         return f"{self.user.username} | {self.get_transaction_type_display()} | {sign}₹{self.amount}"
     
+
+
+
+# <-----------  Model to track deposits to wallet added through razorpay  ------------------>
+
+class WalletDepositOrder(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete= models.CASCADE, related_name= 'deposit_orders')
+    razorpay_order_id = models.CharField(max_length= 255, unique= True)
+    amount = models.DecimalField(max_digits= 10, decimal_places= 2, help_text= 'amount in INR')
+    is_paid = models.BooleanField(default= False)
+    created_at = models.DateTimeField(auto_now_add= True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Deposit of ₹{self.amount} -paid {self.is_paid}"
+
+
+
 
 
 #  <---------  Withdraw money -------------->

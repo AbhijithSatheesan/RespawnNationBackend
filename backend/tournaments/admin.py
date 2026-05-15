@@ -4,6 +4,8 @@ from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 from django.urls import path, reverse
 from django.http import HttpResponseRedirect
+from django.db import transaction
+from decimal import Decimal
 from .models import (
     Tournament, Participant, FootballStanding, 
     FootballMatch, BattleRoyaleMatch, BattleRoyaleResult, TournamentType
@@ -11,17 +13,104 @@ from .models import (
 
 from .engines.factory import get_tournament_engine
 
+from accounts.models import UserProfile, WalletTransaction
+
 admin.site.register(TournamentType)
 
 # 1. THE TOURNAMENT
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'game', 'status', 'max_players', 'generate_button')
+    # Added 'prizes_distributed' so you can see it easily in the list view
+    list_display = ('title', 'game', 'status', 'max_players', 'display_prize_pool', 'generate_button', 'prizes_distributed')
     list_filter = ('status', 'game', 'tournament_type')
     search_fields = ('title',)
 
+    # Register the payout action
+    actions = ['distribute_prize_money']
+
+
+    def display_prize_pool(self, obj):
+        # Grabs the dynamic property from your model and formats it nicely
+        return format_html('<span style="font-weight: bold; color: #28a745;">₹{}</span>', obj.current_prize_pool)
+    
+    # This sets the column header name in the admin panel
+    display_prize_pool.short_description = 'Prize Pool'
+
     # =========================================================================
-    # NEW: SMART DROPDOWN FILTERING
+    # THE PAYOUT ACTION (WALLET INTEGRATION)
+    # =========================================================================
+    @admin.action(description='💰 Distribute Prizes (70/30) & Close Tournament')
+    def distribute_prize_money(self, request, queryset):
+        success_count = 0
+
+        for tournament in queryset:
+            # Safety Check 1: Already paid?
+            if tournament.prizes_distributed:
+                self.message_user(request, f"Skipped '{tournament.title}': Prizes already distributed.", level=messages.WARNING)
+                continue
+            
+            # Safety Check 2: Is there a winner?
+            if not tournament.winner:
+                self.message_user(request, f"Skipped '{tournament.title}': You must select a Winner first.", level=messages.ERROR)
+                continue
+
+            total_pool = tournament.current_prize_pool
+            
+            # CALCULATE SPLITS: 70% Winner, 30% Runner-Up
+            winner_cut = total_pool * Decimal('0.70')
+            runner_up_cut = total_pool * Decimal('0.30')
+
+            with transaction.atomic():
+                # --- PAY THE WINNER ---
+                # Safely ensure the profile exists before trying to lock it
+                UserProfile.objects.get_or_create(user=tournament.winner.user)
+                
+                # Now lock it and pay them
+                winner_profile = UserProfile.objects.select_for_update().get(user=tournament.winner.user)
+                winner_profile.wallet_balance += winner_cut
+                winner_profile.total_earnings += winner_cut
+                winner_profile.save()
+
+                WalletTransaction.objects.create(
+                    user=tournament.winner.user,
+                    amount=winner_cut,
+                    transaction_type='PRIZE',
+                    description=f"1st Place (70%) - {tournament.title}",
+                    tournament=tournament
+                )
+
+                # --- PAY THE RUNNER UP (If they exist) ---
+                if tournament.runner_up:
+                    # Safely ensure the profile exists before trying to lock it
+                    UserProfile.objects.get_or_create(user=tournament.runner_up.user)
+                    
+                    # Now lock it and pay them
+                    runner_up_profile = UserProfile.objects.select_for_update().get(user=tournament.runner_up.user)
+                    runner_up_profile.wallet_balance += runner_up_cut
+                    runner_up_profile.total_earnings += runner_up_cut
+                    runner_up_profile.save()
+
+                    WalletTransaction.objects.create(
+                        user=tournament.runner_up.user,
+                        amount=runner_up_cut,
+                        transaction_type='PRIZE',
+                        description=f"2nd Place (30%) - {tournament.title}",
+                        tournament=tournament
+                    )
+
+                # --- LOCK THE TOURNAMENT ---
+                tournament.status = 'COMPLETED'
+                tournament.prizes_distributed = True
+                tournament.save()
+                
+                success_count += 1
+
+        if success_count > 0:
+            self.message_user(request, f"Successfully distributed prizes for {success_count} tournaments!", level=messages.SUCCESS)
+
+
+    # =========================================================================
+    # SMART DROPDOWN FILTERING
     # =========================================================================
     def get_form(self, request, obj=None, **kwargs):
         # 1. Get the default form Django generated
@@ -45,10 +134,8 @@ class TournamentAdmin(admin.ModelAdmin):
         return form
 
     # =========================================================================
-    # EXISTING METHODS
+    # ENGINE & MATCH GENERATION METHODS
     # =========================================================================
-
-    # 1. URLs for the Custom Action Buttons
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
@@ -57,7 +144,6 @@ class TournamentAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    # 2. The SMART Buttons (Now aware of Engine Types!)
     def generate_button(self, obj):
         # Safely grab the engine code
         engine_code = obj.tournament_type.engine_code if obj.tournament_type else None
@@ -105,7 +191,6 @@ class TournamentAdmin(admin.ModelAdmin):
     
     generate_button.short_description = 'Match Engine'
 
-    # 3. Dynamic Initial Match Generation
     def generate_brackets_view(self, request, tournament_id):
         tournament = self.get_object(request, tournament_id)
         
@@ -121,7 +206,6 @@ class TournamentAdmin(admin.ModelAdmin):
         
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/admin/tournaments/tournament/'))
 
-    # 4. Dynamic Knockout Stage Generation
     def generate_knockouts_view(self, request, tournament_id):
         tournament = self.get_object(request, tournament_id)
         
@@ -136,7 +220,6 @@ class TournamentAdmin(admin.ModelAdmin):
                 self.message_user(request, f"Error: {str(e)}", messages.ERROR)
                 
         return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/admin/tournaments/tournament/'))
-
 
     
 
