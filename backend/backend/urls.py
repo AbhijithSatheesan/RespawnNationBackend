@@ -28,7 +28,8 @@ urlpatterns = [
     path('api/accounts/',include('accounts.urls')),
     path('api/games/', include('games.urls')),
     path('api/streams/', include('streams.urls')),
-    path('api/tournaments/',include('tournaments.urls'))
+    path('api/tournaments/',include('tournaments.urls')),
+    path('api/chat/', include('chat.urls')),
 ]
 
 if settings.DEBUG:

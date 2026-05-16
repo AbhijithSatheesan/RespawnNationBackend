@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'games',
     'streams',
     'tournaments',
+    'chat',
 ]
 
 

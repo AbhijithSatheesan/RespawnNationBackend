@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import FootballMatch, FootballStanding
+from .models import  Tournament,FootballMatch, FootballStanding
+from chat.models import ChatRoom
 
 
 @receiver(post_save, sender= FootballMatch) # when ever a save occurs in FootballMatch models, this function gets called
@@ -87,5 +88,15 @@ def update_group_standing(sender, instance, created, **kwargs):
 
 
 
-
-
+#     <---------------- Automatically create Chatroom whenever a new tournament is created  -------------------->
+@receiver(post_save, sender= Tournament)
+def create_tournament_chatroom(sender, instance, created, **kwargs):
+    if created:
+        # The moment a tournament is made a chatroom is made for it
+        ChatRoom.objects.create(
+            name = f"{instance.title} Lobby",
+            room_type = 'TOURNAMENT',
+            tournament = instance,
+            is_private = True    # we should only allow participants
+        )
+        
