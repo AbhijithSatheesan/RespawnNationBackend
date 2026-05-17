@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 
 from .models import ChatRoom, ChatMessage
-from tournaments.models import Participant
+from tournaments.models import Participant, Tournament
 from games.models import Games
 
 from .serializers import ChatMessageSerializer
@@ -78,21 +78,24 @@ class GetRoomView(APIView):
             return Response({
                 'room_id': room.id, 'room_name' : room.name
             })
-
+        
+        # If its a torunament chat
         elif room_type == 'TOURNAMENT':
             tournament_id = request.query_params.get('tournament_id')
             if not tournament_id:
                 return Response({'error': 'Tournament id is required'}, status= status.HTTP_400_BAD_REQUEST)
-            
-            # Tournament chats are automatically created in signals of tourament
-            room = get_object_or_404(ChatRoom, room_type = 'TOURNAMENT', tournament_id = tournament_id)
+            tournament = get_object_or_404(Tournament, pk = tournament_id)
+            room, created = ChatRoom.objects.get_or_create(
+                room_type = 'TOURNAMENT',
+                tournament = tournament,
+                defaults = {'name' : f'{tournament.title} Hub'}
+            )
             return Response({
                 'room_id' : room.id, 'room_name' : room.name
             })
-        else:
-            return Response({'error' : 'Invalid room type'}, status= status.HTTP_400_BAD_REQUEST)
-       
-
+            
+            
+            
 
 
 class MessageHistoryView(APIView):

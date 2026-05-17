@@ -67,6 +67,7 @@ def register_user(request):
 
     return Response({
         'username' : user.username,
+        'id' : user.id,
         'access_token' : str(refresh.access_token),
         'refresh_token' : str(refresh)
     },
@@ -96,6 +97,7 @@ def login_user(request):
         refresh = RefreshToken.for_user(user)
         return Response({
             'username' : user.username,
+            'id' : user.id,
             'access_token' : str(refresh.access_token),
             'refresh_token' : str(refresh)
         },
@@ -156,6 +158,7 @@ class GoogleLoginView(APIView):
             refresh = RefreshToken.for_user(user)
             return Response({
                 'username' : user.username,
+                'id' : user.id,
                 'access_token' : str(refresh.access_token),
                 'refresh_token' : str(refresh)
 
