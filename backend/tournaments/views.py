@@ -14,7 +14,7 @@ from decimal import Decimal
 from .models import Tournament,Participant,Order
 from .serializers import TournamentSerializer, TournamentDetailSerializer
 from accounts.models import UserProfile, WalletTransaction
-
+from .engines.factory import get_tournament_engine
 
 
 # 1. Create a custom Pagination class for your Tournaments
@@ -276,3 +276,114 @@ def game_tournaments(request, game_id):
     tournaments = Tournament.objects.filter(game_id = game_id).order_by('-created_at')
     serializer = TournamentSerializer(tournaments, many = True, context = {'request': request})
     return Response(serializer.data)
+
+
+
+
+
+class UserProfileDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # 1. THE TROPHY CABINET (Tournaments Won)
+        # Django follows the ForeignKey backwards from winner -> Participant -> User
+        won_tournaments = Tournament.objects.filter(winner__user=user)
+        
+        # 2. ALL REGISTERED TOURNAMENTS
+        # select_related optimizes the database query so it doesn't crash under load
+        my_participants = Participant.objects.filter(user=user).select_related('tournament', 'tournament__game')
+        
+        live_tournaments = []
+        past_tournaments = []
+        upcoming_tournaments = []
+
+        # Sort the tournaments into buckets for your React tabs
+        for p in my_participants:
+            t = p.tournament
+            t_data = {
+                "id": t.id,
+                "title": t.title,
+                "status": t.status,
+                "requires_player_proof": t.requires_player_proof,
+                "game": t.game.name if t.game else "Unknown Game",
+                "participant_id": p.id, # Useful if they need to upload proof
+            }
+            
+            if t.status == 'LIVE':
+                live_tournaments.append(t_data)
+            elif t.status == 'COMPLETED':
+                past_tournaments.append(t_data)
+            else:
+                upcoming_tournaments.append(t_data)
+
+        # Format the trophies cleanly
+        trophies = [
+            {
+                "id": t.id, 
+                "title": t.title, 
+                "game": t.game.name if t.game else "Unknown"
+            } for t in won_tournaments
+        ]
+
+        # 3. SHIP IT TO REACT
+        return Response({
+            "username": user.username,
+            "trophy_count": len(trophies),
+            "trophies": trophies,
+            "dashboard": {
+                "live": live_tournaments,
+                "upcoming": upcoming_tournaments,
+                "past": past_tournaments
+            }
+        })
+    
+
+
+
+
+class UserTournamentMatchesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, tournament_id):
+        tournament = get_object_or_404(Tournament, id=tournament_id)
+        
+        try:
+            # FIX: Just call the factory once, it returns the ready-to-use engine!
+            engine = get_tournament_engine(tournament)
+            matches_data = engine.get_user_matches(request.user)
+            
+            return Response({
+                "tournament_name": tournament.title, 
+                "matches": matches_data
+            })
+        except Exception as e:
+            # Temporarily printing the error to your terminal so we can see if anything else breaks!
+            print(f"Match Fetch Error: {e}") 
+            return Response({"error": str(e)}, status=400)
+
+
+class SubmitMatchResultView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        tournament_id = request.data.get('tournament_id')
+        tournament = get_object_or_404(Tournament, id=tournament_id)
+
+        try:
+            # FIX: Same fix here for when you actually click submit
+            engine = get_tournament_engine(tournament)
+            
+            result_data = engine.submit_score(
+                user=request.user, 
+                data=request.data, 
+                files=request.FILES
+            )
+            return Response({"message": "Result submitted successfully!", "data": result_data})
+            
+        except ValueError as e:
+            return Response({"error": str(e)}, status=403)
+        except Exception as e:
+            print(f"Submit Score Error: {e}")
+            return Response({"error": f"Failed to submit result: {str(e)}"}, status=400)

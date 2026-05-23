@@ -45,6 +45,10 @@ class Tournament(models.Model):
     base_prize_pool = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Starting guaranteed prize money")
     platform_cut_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Percentage of fee kept by the platform (e.g., 20.00)")
     prizes_distributed = models.BooleanField(default= False)
+    requires_player_proof = models.BooleanField(
+        default=True, 
+        help_text="If True, players must upload screenshots to submit scores."
+    )
 
 
     @property
@@ -129,6 +133,22 @@ class FootballStanding(models.Model):
 
     def __str__(self):
         return f"{self.participant.user.username} | {self.group_name} | {self.points} pts"
+    
+
+MATCH_STATUS_CHOICES = [
+    ('PENDING', 'Waiting / Brackets Not Set'),
+    ('SCHEDULED', 'Scheduled'),           
+    ('LIVE', 'Live'),                     
+    ('AWAITING_REVIEW', 'Awaiting Review'), 
+    ('COMPLETED', 'Completed'),           
+    ('DISPUTED', 'Disputed'),             
+]
+
+WIN_REASON_CHOICES = [
+    ('SCORE', 'Normal Win by Score'),
+    ('FORFEIT', 'Opponent Forfeited / No Show'),
+    ('DISQUALIFIED', 'Opponent Disqualified'),
+]
 
 
 # ==========================================
@@ -146,64 +166,93 @@ class FootballMatch(models.Model):
     tournament = models.ForeignKey('Tournament', on_delete=models.CASCADE, related_name='football_matches')
     stage = models.CharField(max_length=20, choices=STAGE_CHOICES)
     round_name = models.CharField(max_length=50) # e.g., 'Group A' or 'Quarter-Final'
-
-    match_number = models.IntegerField(null= True, blank= True)
+    match_number = models.IntegerField(null=True, blank=True)
     
     # The two players facing off
-    player_1 = models.ForeignKey(Participant, related_name='matches_as_p1', null=True, blank=True, on_delete=models.SET_NULL)
-    player_2 = models.ForeignKey(Participant, related_name='matches_as_p2', null=True, blank=True, on_delete=models.SET_NULL)
+    player_1 = models.ForeignKey('Participant', related_name='matches_as_p1', null=True, blank=True, on_delete=models.SET_NULL)
+    player_2 = models.ForeignKey('Participant', related_name='matches_as_p2', null=True, blank=True, on_delete=models.SET_NULL)
 
     # Upload screenshot of scores
-    player_1_proof = models.ImageField(upload_to='matches/proof', null= True, blank=True)
-    player_2_proof = models.ImageField(upload_to='matches/proof', null= True, blank= True)
+    player_1_proof = models.ImageField(upload_to='matches/proof', null=True, blank=True)
+    player_2_proof = models.ImageField(upload_to='matches/proof', null=True, blank=True)
     
     # The result
     p1_score = models.IntegerField(default=0, null=True, blank=True)
     p2_score = models.IntegerField(default=0, null=True, blank=True)
-    winner = models.ForeignKey(Participant, related_name='matches_won', null=True, blank=True, on_delete=models.SET_NULL)
+    winner = models.ForeignKey('Participant', related_name='matches_won', null=True, blank=True, on_delete=models.SET_NULL)
     
     # For knockouts: Tells the winner which match they go to next
     next_match = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='previous_matches')
-    is_completed = models.BooleanField(default=False)
+    
+    # ADVANCED LIFECYCLE & HYBRID BACKWARD COMPATIBILITY
+    status = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES, default='PENDING')
+    is_completed = models.BooleanField(default=False) # Maintained for safety
+    
+    # TIME MANAGEMENT
+    scheduled_time = models.DateTimeField(null=True, blank=True)
+    deadline_time = models.DateTimeField(null=True, blank=True)
+    
+    # RESOLUTION & AUDIT
+    win_reason = models.CharField(max_length=20, choices=WIN_REASON_CHOICES, null=True, blank=True)
+    admin_notes = models.TextField(blank=True, null=True, help_text="Reason for resolving a dispute or forfeit")
+
+    def save(self, *args, **kwargs):
+        # Auto-sync the backward compatible boolean field
+        if self.status == 'COMPLETED':
+            self.is_completed = True
+        else:
+            self.is_completed = False
+            
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.round_name}: {self.player_1} vs {self.player_2}"
 
 
-
-
-
-
-
-
-
+# ==========================================
+# 4. BATTLE ROYALE: THE MATCH OBJECT
+# ==========================================
 class BattleRoyaleMatch(models.Model):
     tournament = models.ForeignKey('Tournament', on_delete=models.CASCADE, related_name='br_matches')
     match_number = models.IntegerField(default=1) 
-    is_completed = models.BooleanField(default=False)
+    
+    # ADVANCED LIFECYCLE & HYBRID BACKWARD COMPATIBILITY
+    status = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES, default='PENDING')
+    is_completed = models.BooleanField(default=False) # Maintained for safety
+    
+    # TIME MANAGEMENT & AUDIT
+    scheduled_time = models.DateTimeField(null=True, blank=True, help_text="Time the custom room lobby opens")
+    deadline_time = models.DateTimeField(null=True, blank=True, help_text="Deadline for scores to be final")
+    admin_notes = models.TextField(blank=True, null=True, help_text="Notes on lobby restarts or room keys")
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs) # Save the match first
+        # 1. Auto-sync the backward compatible boolean field
+        if self.status == 'COMPLETED':
+            self.is_completed = True
+        else:
+            self.is_completed = False
+            
+        super().save(*args, **kwargs) # Save the match status update first
         
-        # AUTOMATIC WINNER CROWNING
-        if self.is_completed:
+        # 2. AUTOMATIC WINNER CROWNING
+        if self.status == 'COMPLETED':
             tourney = self.tournament
             
             # Check if ALL matches in this tournament are completed
-            incomplete_matches = tourney.br_matches.filter(is_completed=False).exists()
+            incomplete_matches = tourney.br_matches.exclude(status='COMPLETED').exists()
             
             if not incomplete_matches:
-                # 1. Change tournament status to completed
+                # Change tournament status to completed
                 tourney.status = 'COMPLETED'
                 
-                # 2. Find the player with the highest overall points
+                # Find the player with the highest overall points
                 top_player = BattleRoyaleResult.objects.filter(match__tournament=tourney)\
                     .values('participant')\
                     .annotate(overall_pts=Sum('total_points'))\
                     .order_by('-overall_pts').first()
                 
                 if top_player:
-                    # 3. Crown them the winner!
+                    # Crown them the winner!
                     tourney.winner_id = top_player['participant']
                 
                 tourney.save()
@@ -212,20 +261,22 @@ class BattleRoyaleMatch(models.Model):
         return f"{self.tournament.title} - Match #{self.match_number}"
     
 
-
-    
-
+# ==========================================
+# 5. BATTLE ROYALE: RESULT SHEET
+# ==========================================
 class BattleRoyaleResult(models.Model):
     match = models.ForeignKey(BattleRoyaleMatch, on_delete=models.CASCADE, related_name='results')
-    participant = models.ForeignKey(Participant, on_delete=models.CASCADE, related_name='br_results')
+    participant = models.ForeignKey('Participant', on_delete=models.CASCADE, related_name='br_results')
     
     kills = models.IntegerField(default=0)
     rank = models.IntegerField(null=True, blank=True)
     total_points = models.IntegerField(default=0)
+    
+    # Unified individual proof upload field 
+    screenshot_proof = models.ImageField(upload_to='br_matches/proof', null=True, blank=True)
 
     def save(self, *args, **kwargs):
         # AUTOMATIC POINT CALCULATION
-        # Example: 1st place = 100pts, 2nd = 80pts, 3rd = 60pts. Plus 10 points per kill.
         placement_points = {1: 100, 2: 80, 3: 60}
         
         base_points = 0
@@ -234,7 +285,7 @@ class BattleRoyaleResult(models.Model):
             
         self.total_points = base_points + (self.kills * 10)
         
-        super().save(*args, **kwargs) # Save the calculated points to the database
+        super().save(*args, **kwargs) 
 
     def __str__(self):
         return f"{self.participant.user.username} | Rank: {self.rank} | Kills: {self.kills}"

@@ -7,6 +7,15 @@ from django.contrib.auth.models import AbstractUser
 class Account(AbstractUser):
     email = models.EmailField(max_length=50, unique= True)
     image = models.ImageField(blank= True, null= True)
+    
+    # To make login via email
+    USERNAME_FIELD = 'email'
+
+    # To make username field still mandatory even if we are not using it for login
+    REQUIRED_FIELDS = ['username']
+
+    def __str__(self):
+        return self.username
 
 
 

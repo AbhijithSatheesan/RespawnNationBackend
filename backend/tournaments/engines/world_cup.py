@@ -127,3 +127,62 @@ class WorldCupEngine(BaseTournamentEngine):
             raise Exception(f"Invalid setup for knockouts. Groups: {num_groups}, Advancing: {total_advancing}")
 
         return True
+    
+
+
+    def submit_score(self, user, data, files):
+        # We expect the React frontend to send the match_id
+        match_id = data.get('match_id')
+        match = FootballMatch.objects.get(id=match_id, tournament=self.tournament)
+
+        # Ensure the match is actually active before accepting scores
+        if match.status not in ['SCHEDULED', 'LIVE', 'DISPUTED']:
+            raise ValueError(f"Cannot submit scores. Match status is {match.status}.")
+
+        # Figure out if the uploading user is Player 1 or Player 2
+        if match.player_1 and match.player_1.user == user:
+            match.p1_score = data.get('score', 0)
+            if 'proof_image' in files:
+                match.player_1_proof = files['proof_image']
+        
+        elif match.player_2 and match.player_2.user == user:
+            match.p2_score = data.get('score', 0)
+            if 'proof_image' in files:
+                match.player_2_proof = files['proof_image']
+        else:
+            raise ValueError("You are not authorized to submit scores for this match.")
+
+        # Flag the match for admin review!
+        match.status = 'AWAITING_REVIEW'
+        match.save()
+        
+        return {"match_id": match.id, "status": match.status}
+    
+
+
+    def get_user_matches(self, user):
+        from django.db.models import Q
+        from ..models import FootballMatch
+        
+        # Find matches where this user is either player 1 or player 2
+        matches = FootballMatch.objects.filter(
+            tournament=self.tournament
+        ).filter(Q(player_1__user=user) | Q(player_2__user=user)).order_by('-id')
+
+        data = []
+        for m in matches:
+            # Figure out who the opponent is
+            is_p1 = m.player_1 and m.player_1.user == user
+            opponent = m.player_2 if is_p1 else m.player_1
+            opponent_name = opponent.user.username if opponent and opponent.user else "TBD"
+            
+            data.append({
+                "match_id": m.id,
+                "round_name": m.round_name,
+                "opponent": opponent_name,
+                "status": m.status,
+                "my_score": m.p1_score if is_p1 else m.p2_score,
+                "requires_proof": self.tournament.requires_player_proof,
+                "type": "1v1"
+            })
+        return data

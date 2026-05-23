@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
     'rest_framework_simplejwt',
+    'djoser',
     
 
 
@@ -211,7 +212,39 @@ else:
 
 
 
+DOMAIN = 'respawnnation.pages.dev'         # React frontend's address
+SITE_NAME = 'Respawn Nation'
 
+# DOMAIN = 'localhost:5173'         # React frontend's address
+# SITE_NAME = 'Respawn Nation'
+    
+
+
+
+# --- DJOSER CONFIGURATION ---
+DJOSER = {
+    'LOGIN_FIELD': 'email', # Forces Djoser to use email for login, matching your custom User model
+    'USER_CREATE_PASSWORD_RETAIN': False,
+
+   
+    # Email Verification Settings
+    'SEND_ACTIVATION_EMAIL': True,
+    'SEND_CONFIRMATION_EMAIL': True,
+    'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,
+    
+    # These point to your REACT frontend routes!
+    'ACTIVATION_URL': 'activate/{uid}/{token}',
+    'PASSWORD_RESET_CONFIRM_URL': 'reset-password/{uid}/{token}',
+}
+
+# --- EMAIL SMTP CONFIGURATION ---
+# For development, you can use your Gmail account with an "App Password"
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'supportrespawnnation@gmail.com'
+EMAIL_HOST_PASSWORD = 'idwfvlixoktrpsbv'
 
 
 

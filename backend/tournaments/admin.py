@@ -287,21 +287,16 @@ class FootballMatchAdmin(admin.ModelAdmin):
     list_select_related = ('tournament', 'player_1__user', 'player_2__user')
     list_per_page = 50 
 
-    # --- NEW: THE UX BUTTON INJECTOR ---
+    # --- THE UX BUTTON INJECTOR (Keep this, it's great!) ---
     def changelist_view(self, request, extra_context=None):
-        # If the user hasn't selected a tournament filter yet...
         if 'tournament__id__exact' not in request.GET:
-            # Find all the tournaments that are currently live
             live_tournaments = Tournament.objects.filter(status='LIVE')
             
             if live_tournaments.exists():
-                # Build physical HTML buttons for each one
                 buttons_html = ""
                 for t in live_tournaments:
-                    # This creates a blue button that links exactly to this tournament's matches
                     buttons_html += f'<a href="?tournament__id__exact={t.id}" style="background: #79aec8; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; margin-right: 10px; display: inline-block; margin-bottom: 5px;">{t.title}</a>'
                 
-                # Tell Django it is safe to render this HTML, and display it as a message!
                 message = mark_safe(f"<div style='margin-bottom: 5px; font-size: 15px;'><b>Select a LIVE Tournament to manage matches:</b><br><br>{buttons_html}</div>")
                 messages.info(request, message)
             else:
@@ -309,13 +304,17 @@ class FootballMatchAdmin(admin.ModelAdmin):
 
         return super().changelist_view(request, extra_context)
 
-    # --- EXISTING SHIELD LOGIC ---
+    # --- FIXED: JUST RETURN THE DATA ---
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        qs = qs.filter(tournament__status='LIVE')
+        
+        # Check if we are on the main list view (not editing a specific match)
         if request.resolver_match and request.resolver_match.url_name.endswith('_changelist'):
+            
+            # If the admin hasn't clicked a tournament filter yet, return 0 matches
             if 'tournament__id__exact' not in request.GET:
                 return qs.none()
+                
         return qs
 
     def get_form(self, request, obj=None, **kwargs):
@@ -325,7 +324,6 @@ class FootballMatchAdmin(admin.ModelAdmin):
                 id__in=[obj.player_1.id, obj.player_2.id]
             )
         return form
-
 
 
 

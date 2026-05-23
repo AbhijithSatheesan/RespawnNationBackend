@@ -2,11 +2,13 @@ from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
+from django.db.models import Q
 import random
 
 from .models import Games, GameCategory
-from .serializers import GamesSerializer,GameCardSerializer
+from .serializers import GamesSerializer,GameCardSerializer, GameSerializer
 
 
 
@@ -20,13 +22,13 @@ def browse_games(request):
 
     # 1. Limit to 8 games per row (Perfect for horizontal scrolling)
     trending_category = get_object_or_404(GameCategory, name="Trending")
-    trending_games = trending_category.games.all()[:8]
+    trending_games = trending_category.games.all()
 
     top_rated_category = get_object_or_404(GameCategory, name='Top Rated')
-    top_rated_games = top_rated_category.games.all()[:8]
+    top_rated_games = top_rated_category.games.all()
 
     # 2. Limit to only 4 main categories to prevent endless scrolling
-    main_categories = GameCategory.objects.filter(main_category=True)[:4]
+    main_categories = GameCategory.objects.filter(main_category=True)[:8]
     category_games = {}
 
     for category in main_categories:
@@ -86,11 +88,7 @@ def trending_game(request):
     return Response(data)
 
 
-from rest_framework import generics, status, permissions
-from rest_framework.response import Response
-from django.db.models import Q
-from .models import Games
-from .serializers import  GameSerializer
+
 
 class GameSearchView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny] # Anyone can search games
@@ -115,3 +113,21 @@ def game_detail(request, pk):
     serializer = GamesSerializer(game)
     return Response(serializer.data)
 
+
+
+@api_view(['GET'])
+def get_games_by_category(request, category_name):
+    try:
+        # Use name__iexact for case-insensitive matching just to be safe
+        category = GameCategory.objects.get(name__iexact=category_name)
+        games = Games.objects.filter(categories=category)
+        
+        serializer = GameCardSerializer(games, many=True)
+        
+        return Response({
+            "category_name": category.name,
+            "games": serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except GameCategory.DoesNotExist:
+        return Response({"error": "Category not found"}, status=status.HTTP_404_NOT_FOUND)

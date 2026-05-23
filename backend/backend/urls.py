@@ -30,6 +30,9 @@ urlpatterns = [
     path('api/streams/', include('streams.urls')),
     path('api/tournaments/',include('tournaments.urls')),
     path('api/chat/', include('chat.urls')),
+
+    path('api/auth/', include('djoser.urls')),
+    path('api/auth/', include('djoser.urls.jwt')),
 ]
 
 if settings.DEBUG:
