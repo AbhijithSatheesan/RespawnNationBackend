@@ -7,5 +7,6 @@ urlpatterns = [
     path('search/', GameSearchView.as_view(), name='search-games'),
     path('game/<int:pk>/', game_detail, name= 'game_details'),
     path('category/<str:category_name>/', get_games_by_category, name='category-games'),
+    path('search/', search_games, name='search-games'),
    
 ]

@@ -22,13 +22,13 @@ def browse_games(request):
 
     # 1. Limit to 8 games per row (Perfect for horizontal scrolling)
     trending_category = get_object_or_404(GameCategory, name="Trending")
-    trending_games = trending_category.games.all()
+    trending_games = trending_category.games.all()[:10]
 
     top_rated_category = get_object_or_404(GameCategory, name='Top Rated')
-    top_rated_games = top_rated_category.games.all()
+    top_rated_games = top_rated_category.games.all()[:10]
 
     # 2. Limit to only 4 main categories to prevent endless scrolling
-    main_categories = GameCategory.objects.filter(main_category=True)[:8]
+    main_categories = GameCategory.objects.filter(main_category=True)[:5]
     category_games = {}
 
     for category in main_categories:
@@ -50,7 +50,20 @@ def browse_games(request):
 
 
 
-
+@api_view(['GET'])
+def search_games(request):
+    query = request.GET.get('q', '').strip()
+    
+    if len(query) > 0:
+        games = Games.objects.filter(name__icontains=query)[:5]
+        
+        # ADDED: context={'request': request} 
+        # This allows the serializer to build full local URLs if needed
+        serializer = GameCardSerializer(games, many=True, context={'request': request})
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    return Response([], status=status.HTTP_200_OK)
 
 
 
