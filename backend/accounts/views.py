@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth import get_user_model,authenticate
+from rest_framework import generics
 from rest_framework.decorators import api_view,authentication_classes,permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -9,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils.text import slugify
 from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
-from .serializers import UserProfileSerializer
+from .serializers import UserProfileSerializer, WalletTransactionSerializer
 
 # Google
 from google.oauth2 import id_token
@@ -18,7 +19,6 @@ from google.auth.transport import requests as google_requests  # import like thi
 # Create your views here.
 
 User = get_user_model()
-
 
 
 
@@ -34,10 +34,37 @@ class MyProfileView(APIView):
         serializer = UserProfileSerializer(profile, context={'request': request})
         return Response(serializer.data)
 
+    def patch(self, request):
+        # 1. Get the current user's profile
+        profile = request.user.profile
+        
+        # 2. Pass the incoming data (which includes the image files) to the serializer
+        # partial=True means we don't require EVERY field to be sent, just the ones being updated
+        serializer = UserProfileSerializer(
+            profile, 
+            data=request.data, 
+            partial=True, 
+            context={'request': request}
+        )
+        
+        # 3. Validate and save
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        # 4. If something goes wrong (e.g., wrong file type), return the error
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
 
+class TransactionHistoryView(generics.ListAPIView):
+    serializer_class = WalletTransactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Return all transactions for the user, ordered newest to oldest
+        return self.request.user.transactions.all().order_by('-created_at')
 
 
 

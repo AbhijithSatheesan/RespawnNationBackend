@@ -14,5 +14,6 @@ urlpatterns = [
     path('wallet/withdraw/', RequestWithdrawalView.as_view(), name='wallet-withdraw'),
     path('wallet/deposit/generate/', GenerateDepositOrderView.as_view(), name='generate-deposit-order'),
     path('wallet/deposit/verify/', VerifyDepositView.as_view(), name='verify-deposit'),
+    path('transactions/history/', TransactionHistoryView.as_view(), name='transaction-history'),
 
 ]

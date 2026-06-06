@@ -226,6 +226,8 @@ DJOSER = {
     'LOGIN_FIELD': 'email', # Forces Djoser to use email for login, matching your custom User model
     'USER_CREATE_PASSWORD_RETAIN': False,
 
+    
+
    
     # Email Verification Settings
     'SEND_ACTIVATION_EMAIL': True,
@@ -235,6 +237,12 @@ DJOSER = {
     # These point to your REACT frontend routes!
     'ACTIVATION_URL': 'activate/{uid}/{token}',
     'PASSWORD_RESET_CONFIRM_URL': 'reset-password/{uid}/{token}',
+
+    'SERIALIZERS': {
+        # Tells Djoser: "When returning user info, use my custom serializer instead of djoser"
+        'current_user': 'accounts.serializers.CustomUserSerializer',
+        'user': 'accounts.serializers.CustomUserSerializer',
+    }
 }
 
 # --- EMAIL SMTP CONFIGURATION ---

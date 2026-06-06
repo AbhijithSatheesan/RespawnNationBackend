@@ -102,7 +102,7 @@ class MessageHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, room_id):
-        messages = ChatMessage.objects.filter(room_id = room_id).order_by('-created_at')[:50]
+        messages = ChatMessage.objects.filter(room_id = room_id).order_by('-created_at')[:25]
 
         # Return the oldest first for the chat UI
         serializer = ChatMessageSerializer(reversed(messages), many = True)

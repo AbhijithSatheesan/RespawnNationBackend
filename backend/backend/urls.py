@@ -16,8 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
+from rest_framework.routers import DefaultRouter
 from django.conf import settings
 from django.conf.urls.static import static
+
+from accounts.customdjoser import CustomUserViewSet
+
+router = DefaultRouter()
+router.register("users", CustomUserViewSet, basename="users")
 
 # To ensure only admin can enter the django admin page
 admin.site.has_permission = lambda request : request.user.is_active and (request.user.is_superuser or request.user.is_staff)
@@ -31,7 +37,7 @@ urlpatterns = [
     path('api/tournaments/',include('tournaments.urls')),
     path('api/chat/', include('chat.urls')),
 
-    path('api/auth/', include('djoser.urls')),
+    path('api/auth/', include(router.urls)),
     path('api/auth/', include('djoser.urls.jwt')),
 ]
 

@@ -28,6 +28,7 @@ class Account(AbstractUser):
 class UserProfile(models.Model):
     # 1. Identity & Link
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
+    profile_picture = models.ImageField(upload_to= 'profiles/avatars', blank= True, null= True)
     bio = models.TextField(max_length=500, blank=True, null=True)
     banner_image = models.ImageField(upload_to='profiles/banners/', blank=True, null=True)
     
