@@ -13,6 +13,9 @@ class TournamentSerializer(serializers.ModelSerializer):
     winner_name = serializers.CharField(source='winner.user.username', read_only=True, default="TBD")
     current_participants = serializers.IntegerField(source='participants.count', read_only=True)
     is_registered = serializers.SerializerMethodField()
+
+    type_name = serializers.CharField(source='tournament_type.name', read_only=True)
+    
     
     # FIX: Change this to a SerializerMethodField
     current_prize_pool = serializers.SerializerMethodField()
@@ -27,7 +30,7 @@ class TournamentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'status', 'max_players', 'registration_deadline', 
             'game_name', 'winner_name', 'current_participants','is_registered',
-            'custom_banner', 'promo_background', 'format_overlay', 'entry_fee', 'current_prize_pool'
+            'custom_banner', 'promo_background','type_name',  'format_overlay', 'entry_fee', 'current_prize_pool'
         ]
 
     # FIX: Manually grab the property and force it into a JSON-safe float
@@ -95,13 +98,16 @@ class BattleRoyaleMatchSerializer(serializers.ModelSerializer):
         fields = ['id', 'match_number', 'is_completed']
 
 
-# ==========================================
-# 4. MASTER DETAIL SERIALIZER (For Single Tournament Page)
-# ==========================================
+
+
+# <<<<<------------------ TOURNAMENT DETAIL SERIALIZER -------------------------->>>>>
+
 class TournamentDetailSerializer(serializers.ModelSerializer):
     game_name = serializers.CharField(source='game.name', read_only=True)
     engine_code = serializers.CharField(source='tournament_type.engine_code', read_only=True, default="unknown")
     winner_name = serializers.CharField(source='winner.user.username', read_only=True, default=None)
+    type_name = serializers.CharField(source='tournament_type.name', read_only=True)
+    type_description = serializers.CharField(source='tournament_type.description', read_only=True)
     
     # Custom Banner for the detail page header
     custom_banner = serializers.SerializerMethodField()
@@ -118,7 +124,7 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
         model = Tournament
         fields = [
             'id', 'title', 'status', 'max_players', 'game_name', 
-            'engine_code', 'custom_banner', 'winner_name', 
+            'engine_code','type_description', 'type_name', 'custom_banner', 'winner_name', 
             'standings', 'matches', 
             'br_lobbies', 'br_leaderboard'
         ]

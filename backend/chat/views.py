@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from .models import ChatRoom, ChatMessage
 from tournaments.models import Participant, Tournament
 from games.models import Games
-
+from rest_framework.pagination import PageNumberPagination
 from .serializers import ChatMessageSerializer
 
 
@@ -26,7 +26,7 @@ class SendMessageView(APIView):
         
         # security chck for tournament
         if room.room_type == 'TOURNAMENT':
-            is_registered = Participant.objects.filter(tournament = room.tournament, user = request.user).exists()
+            is_registered = Participant.objects.filter(tournament = room.tournament, user = request.user).exists() or request.user.is_staff
             if not is_registered:
                 return Response({'error': 'You are not allowed to message here'}, status= status.HTTP_403_FORBIDDEN)
         
@@ -98,17 +98,61 @@ class GetRoomView(APIView):
             
 
 
+
 class MessageHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, room_id):
-        messages = ChatMessage.objects.filter(room_id = room_id).order_by('-created_at')[:25]
+        # 1. Grab pagination query limits from React (Default to page 1, 25 items per page)
+        page = int(request.query_params.get('page', 1))
+        page_size = 25
+        
+        offset = (page - 1) * page_size
+        limit = offset + page_size
 
-        # Return the oldest first for the chat UI
-        serializer = ChatMessageSerializer(reversed(messages), many = True)
+        # 2. Add 'is_deleted=False' to your query filter
+        all_messages = ChatMessage.objects.filter(
+            room_id=room_id, 
+            is_deleted=False
+        ).order_by('-created_at')
 
-        return Response(serializer.data)
+        # Check if there are more messages beyond this current slice
+        total_count = all_messages.count()
+        has_next = total_count > limit
+
+        # Slice the database query dynamically based on the current page page
+        sliced_messages = all_messages[offset:limit]
+
+        # Return oldest first for the frontend chat sequence layout
+        serializer = ChatMessageSerializer(reversed(sliced_messages), many=True)
+
+        # 3. Return both the messages AND the pagination metadata
+        return Response({
+            "results": serializer.data,
+            "has_more": has_next
+        })
 
 
 
 
+# <<---------------------------Delete message (we will do a soft delete)----------------------->>
+class DeleteChatMessage(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, message_id):
+        message = get_object_or_404(ChatMessage, id = message_id)
+        user = request.user
+
+        # check who is do it
+        if user == message.sender or user.is_staff:
+            message.is_deleted = True 
+            message.save()
+
+            # Return a 204 after deletion, its a restful stantard
+            return Response(status= status.HTTP_204_NO_CONTENT)
+    
+        else:
+            return Response(
+                {'error': 'You are not authorized to do this'},
+                status= status.HTTP_403_FORBIDDEN
+            )

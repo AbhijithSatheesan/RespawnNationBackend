@@ -1,66 +1,66 @@
 from rest_framework import serializers
-from .models import Stream, Games
+from .models import Stream
+from games.models import Games
+from tournaments.models import Tournament 
 
-
-# The serializer which shows to viewrs
+# 1. What the public sees (Watch Page / Feed)
 class StreamPublicSerializer(serializers.ModelSerializer):
     hls_url = serializers.ReadOnlyField()
-    # Grab the username from the related User model
     streamer_name = serializers.CharField(source='user.username', read_only=True)
+    game_name = serializers.CharField(source='game.name', read_only=True)
 
     class Meta:
         model = Stream
         fields = [
-            'id',
-            'title',
-            'description',
-            'is_live',
-            'playback_id',
-            'hls_url',
-            'streamer_name',
+            'id', 'title', 'description', 'is_live', 
+            'playback_id', 'hls_url', 'streamer_name', 'game_name',
+            'stream_type', 'external_url' # NEW: Expose platform info to React
         ]
 
-
-
-# The serializer for owner to see which contains importand infos
+# 2. What the creator sees (Dashboard)
 class StreamOwnerSerializer(serializers.ModelSerializer):
     ingest_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Stream
         fields = [
-            'id',
-            'title',
-            'description',
-            'is_live',
-            'stream_key',
-            'playback_id',
-            'ingest_url',
+            'id', 'title', 'description', 'is_live', 
+            'stream_key', 'playback_id', 'ingest_url',
+            'stream_type', 'external_url' 
         ]
 
-    # This function passes cloudflare global ingest endpoint
     def get_ingest_url(self, obj):
-        return "rtmps://live.cloudflare.com/live"
-    
+        # Only return RTMP URL if it's Cloudflare
+        if obj.stream_type == 'CLOUDFLARE':
+            return "rtmps://live.cloudflare.com/live"
+        return None
 
-
-
-
-
+# 3. How the creator updates their stream
 class StreamUpdateSerializer(serializers.ModelSerializer):
     game_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    active_tournament_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Stream
-        fields = ['title', 'description', 'is_live', 'game_id','playback_id']
+        fields = [
+            'title', 'description', 'is_live', 'game_id', 'playback_id',
+            'stream_type', 'external_url', 'active_tournament_id' 
+        ]
 
     def update(self, instance, validated_data):
-        # Handle Game relationship manually if passed as ID
         game_id = validated_data.pop('game_id', None)
         if game_id:
             try:
                 instance.game = Games.objects.get(id=game_id)
             except Games.DoesNotExist:
-                pass # Or raise validation error
+                pass
+        
+        # Manually handle Tournament relationship
+        tourney_id = validated_data.pop('active_tournament_id', None)
+        if tourney_id:
+            try:
+                instance.active_tournament = Tournament.objects.get(id=tourney_id)
+            except Tournament.DoesNotExist:
+                pass
         
         return super().update(instance, validated_data)

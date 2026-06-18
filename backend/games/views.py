@@ -22,10 +22,10 @@ def browse_games(request):
 
     # 1. Limit to 8 games per row (Perfect for horizontal scrolling)
     trending_category = get_object_or_404(GameCategory, name="Trending")
-    trending_games = trending_category.games.all()[:10]
+    trending_games = trending_category.games.all()[:20]
 
     top_rated_category = get_object_or_404(GameCategory, name='Top Rated')
-    top_rated_games = top_rated_category.games.all()[:10]
+    top_rated_games = top_rated_category.games.all()[:20]
 
     # 2. Limit to only 4 main categories to prevent endless scrolling
     main_categories = GameCategory.objects.filter(main_category=True)[:5]

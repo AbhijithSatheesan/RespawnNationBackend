@@ -19,7 +19,7 @@ from .engines.factory import get_tournament_engine
 
 # 1. Create a custom Pagination class for your Tournaments
 class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 2 # Fetch 10 at a time
+    page_size = 10 # Fetch 10 at a time
     page_size_query_param = 'page_size'
     max_page_size = 50
 
@@ -273,8 +273,19 @@ class RegisterTournamentView(APIView):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def game_tournaments(request, game_id):
-    tournaments = Tournament.objects.filter(game_id = game_id).order_by('-created_at')
+
+    # get all tournament s this game
+    tournaments = Tournament.objects.filter(game_id = game_id)
+
+    # check the status sent from frontend
+    status_param = request.query_params.get('status', None)
+    if status_param:
+        tournaments = tournaments.filter(status = status_param)
+
+    # Order the data by date created
+    tournaments = tournaments.order_by('-created_at')
     serializer = TournamentSerializer(tournaments, many = True, context = {'request': request})
+    
     return Response(serializer.data)
 
 

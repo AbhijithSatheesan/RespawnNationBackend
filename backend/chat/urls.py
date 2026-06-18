@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import GetRoomView, SendMessageView, MessageHistoryView
+from .views import GetRoomView, SendMessageView, MessageHistoryView, DeleteChatMessage
 
 urlpatterns = [
     # Gets room info by type (GLOBAL) or by Tournament ID
@@ -8,4 +8,6 @@ urlpatterns = [
     path('room/<int:room_id>/history/', MessageHistoryView.as_view(), name='chat-history'),
     # Sends a new message
     path('room/<int:room_id>/send/', SendMessageView.as_view(), name='send-message'),
+    # Delete a message
+    path('room/<int:message_id>/delete/', DeleteChatMessage.as_view(), name='delete-message'),
 ]
