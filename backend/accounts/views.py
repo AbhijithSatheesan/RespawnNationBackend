@@ -200,3 +200,5 @@ class GoogleLoginView(APIView):
 
 
 
+def health_check(request):
+    return Response({"status": "awake"})

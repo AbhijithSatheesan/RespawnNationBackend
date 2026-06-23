@@ -31,8 +31,6 @@ class MyStreamView(APIView):
        
 
        
-
-# Vieww to create a stream
 class CreateStreamView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -46,18 +44,31 @@ class CreateStreamView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )    
         
-        # 2. Get the requested platform from the frontend (Default to Cloudflare)
+        # 2. Extract ALL data from the React form payload
         stream_type = request.data.get('stream_type', 'CLOUDFLARE')
         external_url = request.data.get('external_url', '')
+        title = request.data.get('title', f"{user.username}'s Stream")
+        description = request.data.get('description', '')
+        
+        # Handle booleans properly from JSON
+        is_live_data = request.data.get('is_live', False)
+        is_live = str(is_live_data).lower() == 'true' if isinstance(is_live_data, str) else bool(is_live_data)
+        
+        game_id = request.data.get('game_id')
+        active_tournament_id = request.data.get('active_tournament_id')
+
+        # 3. Get Game and Tournament instances if they were provided
+        game_instance = Games.objects.filter(id=game_id).first() if game_id else None
+        tournament_instance = Tournament.objects.filter(id=active_tournament_id).first() if active_tournament_id else None
 
         # ==========================================
-        # PATH A: CLOUDFLARE (Requires API Call)
+        # PATH A: CLOUDFLARE
         # ==========================================
         if stream_type == 'CLOUDFLARE':
             cloudflare_url = f"https://api.cloudflare.com/client/v4/accounts/{settings.CLOUDFLARE_ACCOUNT_ID}/stream/live_inputs"
             headers = {
-                "Authorization" : f"Bearer {settings.CLOUDFLARE_API_TOKEN}",
-                "Content-Type" : "application/json"
+                "Authorization": f"Bearer {settings.CLOUDFLARE_API_TOKEN}",
+                "Content-Type": "application/json"
             }
             data = {
                 "meta": {"name": f"{user.username}'s Stream"},
@@ -77,35 +88,41 @@ class CreateStreamView(APIView):
                         cloudflare_id=result.get('uid'),
                         stream_key=result['rtmps']['streamKey'],
                         playback_id=result.get('uid'),
-                        title=f"{user.username}'s first Stream"
+                        title=title,
+                        description=description,
+                        is_live=is_live,
+                        game=game_instance,
+                        active_tournament=tournament_instance
                     )
                     serializer = StreamOwnerSerializer(stream)
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
                 else:
-                    return Response({"message": "Failed to create Stream"}, status=status.HTTP_502_BAD_GATEWAY)
+                    return Response({"message": "Failed to connect to Cloudflare"}, status=status.HTTP_502_BAD_GATEWAY)
             except requests.exceptions.RequestException:
                 return Response({"message": "Error connecting to Provider."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # ==========================================
-        # PATH B: YOUTUBE OR TWITCH (No API Call Needed)
+        # PATH B: YOUTUBE OR TWITCH (No API Call)
         # ==========================================
         elif stream_type in ['YOUTUBE', 'TWITCH']:
             if not external_url:
-                return Response({"message": "External URL is required for YouTube/Twitch"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": f"External URL is required for {stream_type}"}, status=status.HTTP_400_BAD_REQUEST)
 
             stream = Stream.objects.create(
                 user=user,
                 stream_type=stream_type,
                 external_url=external_url,
-                title=f"{user.username}'s first Stream"
+                title=title,
+                description=description,
+                is_live=is_live,
+                game=game_instance,
+                active_tournament=tournament_instance
             )
             serializer = StreamOwnerSerializer(stream)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
             
         else:
             return Response({"message": "Invalid Stream Type"}, status=status.HTTP_400_BAD_REQUEST)
-
-
 
 
 class RegenerateStreamKeyView(APIView):
@@ -124,7 +141,7 @@ class RegenerateStreamKeyView(APIView):
             )
         
         # avoid hitting cloudflare if using Youtube/Twitch
-        if Stream.stream_type != 'CLOUDFLARE':
+        if stream.stream_type != 'CLOUDFLARE':
             return Response({
                 'message':'External Stream services (youtube/twitch) do not provide RTMP keys here'
             }, status= status.HTTP_400_BAD_REQUEST)
