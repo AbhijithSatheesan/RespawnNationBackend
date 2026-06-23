@@ -198,7 +198,7 @@ class GoogleLoginView(APIView):
 
 
 
-
+from django.http import JsonResponse
 
 def health_check(request):
-    return Response({"status": "awake"})
+    return JsonResponse({"status": "awake"})

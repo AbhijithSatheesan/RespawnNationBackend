@@ -15,6 +15,8 @@ urlpatterns = [
     path('wallet/deposit/generate/', GenerateDepositOrderView.as_view(), name='generate-deposit-order'),
     path('wallet/deposit/verify/', VerifyDepositView.as_view(), name='verify-deposit'),
     path('transactions/history/', TransactionHistoryView.as_view(), name='transaction-history'),
+
+    # Ping
     path('ping/', health_check, name= 'health-check')
 
 ]
