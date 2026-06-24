@@ -212,11 +212,11 @@ else:
 
 
 
-# DOMAIN = 'respawnnation.pages.dev'         # React frontend's address
-# SITE_NAME = 'Respawn Nation'
-
-DOMAIN = 'localhost:5173'         # React frontend's address
+DOMAIN = 'respawnnation.pages.dev'         # React frontend's address
 SITE_NAME = 'Respawn Nation'
+
+# DOMAIN = 'localhost:5173'         # React frontend's address
+# SITE_NAME = 'Respawn Nation'
     
 
 
