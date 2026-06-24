@@ -212,22 +212,17 @@ else:
 
 
 
-DOMAIN = 'respawnnation.pages.dev'         # React frontend's address
-SITE_NAME = 'Respawn Nation'
 
 # DOMAIN = 'localhost:5173'         # React frontend's address
 # SITE_NAME = 'Respawn Nation'
     
-
-
+DOMAIN = 'respawnnation.pages.dev'         # React frontend's address
+SITE_NAME = 'Respawn Nation'
 
 # --- DJOSER CONFIGURATION ---
 DJOSER = {
-    'LOGIN_FIELD': 'email', # Forces Djoser to use email for login, matching your custom User model
+    'LOGIN_FIELD': 'email', 
     'USER_CREATE_PASSWORD_RETAIN': False,
-
-    
-
    
     # Email Verification Settings
     'SEND_ACTIVATION_EMAIL': True,
@@ -239,23 +234,25 @@ DJOSER = {
     'PASSWORD_RESET_CONFIRM_URL': 'reset-password/{uid}/{token}',
 
     'SERIALIZERS': {
-        # Tells Djoser: "When returning user info, use my custom serializer instead of djoser"
         'current_user': 'accounts.serializers.CustomUserSerializer',
         'user': 'accounts.serializers.CustomUserSerializer',
     }
 }
 
-# --- EMAIL SMTP CONFIGURATION ---
-# For development, you can use your Gmail account with an "App Password"
+# --- EMAIL SMTP CONFIGURATION (CLOUD OPTIMIZED) ---
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+
+# USE SSL ON PORT 465 INSTEAD OF TLS ON PORT 587
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_USE_TLS = False
+
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
-
-
+# CRITICAL FIX: 10-second timeout prevents Gunicorn from freezing and crashing
+EMAIL_TIMEOUT = 10
 
 
 
