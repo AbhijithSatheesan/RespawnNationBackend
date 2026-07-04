@@ -102,6 +102,8 @@ class BattleRoyaleMatchSerializer(serializers.ModelSerializer):
 
 # <<<<<------------------ TOURNAMENT DETAIL SERIALIZER -------------------------->>>>>
 
+
+
 class TournamentDetailSerializer(serializers.ModelSerializer):
     game_name = serializers.CharField(source='game.name', read_only=True)
     engine_code = serializers.CharField(source='tournament_type.engine_code', read_only=True, default="unknown")
@@ -109,24 +111,25 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
     type_name = serializers.CharField(source='tournament_type.name', read_only=True)
     type_description = serializers.CharField(source='tournament_type.description', read_only=True)
     
-    # Custom Banner for the detail page header
+    # Custom fields that require methods to calculate/fetch data
     custom_banner = serializers.SerializerMethodField()
+    is_registered = serializers.SerializerMethodField()
+    current_participants = serializers.SerializerMethodField() # FIX: Added method field
     
-    # Football Fields
+    # Format-specific fields
     standings = serializers.SerializerMethodField()
     matches = serializers.SerializerMethodField()
-    
-    # Battle Royale Fields
     br_lobbies = serializers.SerializerMethodField()
     br_leaderboard = serializers.SerializerMethodField()
 
     class Meta:
         model = Tournament
         fields = [
-            'id', 'title', 'status', 'max_players', 'game_name', 
-            'engine_code','type_description', 'type_name', 'custom_banner', 'winner_name', 
-            'standings', 'matches', 
-            'br_lobbies', 'br_leaderboard'
+            'id', 'title', 'status', 'max_players', 'current_participants', 
+            'entry_fee', 'current_prize_pool', 'registration_deadline',
+            'game_name', 'engine_code', 'type_description', 'type_name', 
+            'custom_banner', 'winner_name', 'is_registered',
+            'standings', 'matches', 'br_lobbies', 'br_leaderboard'
         ]
 
     def get_custom_banner(self, obj):
@@ -134,6 +137,19 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request: return request.build_absolute_uri(obj.custom_banner.url)
         return obj.custom_banner.url
+
+    # --- Participant & Registration Data ---
+    def get_current_participants(self, obj):
+        # NOTE: If your Tournament model uses a different related name than 'participants', 
+        # (for example, 'registrations'), change this to obj.registrations.count()
+        return obj.participants.count()
+
+    def get_is_registered(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            # Matches the related name used in get_current_participants
+            return obj.participants.filter(user=request.user).exists()
+        return False
 
     # --- Football Data Fetchers ---
     def get_standings(self, obj):
@@ -175,7 +191,3 @@ class TournamentDetailSerializer(serializers.ModelSerializer):
             ]
             return leaderboard
         return []
-    
-
-
-    

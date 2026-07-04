@@ -90,7 +90,7 @@ REST_FRAMEWORK = {
 ## Token expiry time
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=10),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=20),
 
     # The rest may remain default
@@ -225,8 +225,8 @@ DJOSER = {
     'USER_CREATE_PASSWORD_RETAIN': False,
    
     # Email Verification Settings
-    'SEND_ACTIVATION_EMAIL': True,
-    'SEND_CONFIRMATION_EMAIL': True,
+    'SEND_ACTIVATION_EMAIL': False,
+    'SEND_CONFIRMATION_EMAIL': False,
     'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,
     
     # These point to your REACT frontend routes!
