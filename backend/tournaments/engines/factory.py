@@ -1,5 +1,6 @@
 from .world_cup import WorldCupEngine
 from .battle_royale import BattleRoyaleEngine
+from .points_race import PointsRaceEngine
 
 def get_tournament_engine(tournament):
     if not tournament.tournament_type or not tournament.tournament_type.engine_code:
@@ -7,7 +8,8 @@ def get_tournament_engine(tournament):
     
     ENGINE_MAPPING = {
         'world_cup': WorldCupEngine,
-        'battle_royale': BattleRoyaleEngine
+        'battle_royale': BattleRoyaleEngine,
+        'points_race' : PointsRaceEngine
     }
 
     engine_code = tournament.tournament_type.engine_code

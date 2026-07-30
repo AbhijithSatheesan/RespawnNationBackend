@@ -2,9 +2,6 @@ from django.db import models
 from decimal import Decimal
 from django.db.models import Sum
 from games.models import Games
-
-# Create your models here.
-
 from django.db import models
 from django.conf import settings
 
@@ -12,7 +9,7 @@ from django.conf import settings
 
 class TournamentType(models.Model):
     name = models.CharField(max_length= 100, unique= True)
-    engine_code = models.CharField(max_length= 50, unique= True, null= True)
+    engine_code = models.CharField(max_length= 50, null= True)
     description = models.TextField(blank= True, null= True)
     format_overlay = models.ImageField(upload_to='tournaments/overlays', null= True, blank= True)
 
@@ -22,7 +19,7 @@ class TournamentType(models.Model):
     # when creating new TournamentType, give engine code, create a file with same engine code in tournaments/engine,
     #    write the new tournament logic in the file we created and add it to the factory.py to connect it with the tournament
 
-# 1. THE TOURNAMENT (The Main Event)
+
 class Tournament(models.Model):
     STATUS_CHOICES = [
         ('REGISTRATION', 'Registration Open'),
@@ -114,9 +111,9 @@ class Order(models.Model):
 
 
 
-# ==========================================
-# 2. FOOTBALL: GROUP STAGE SCORECARD
-# ==========================================
+
+#  FOOTBALL: GROUP STAGE SCORECARD
+
 class FootballStanding(models.Model):
     """
     If they are playing FIFA, this acts as their row in the Group Table.
@@ -151,9 +148,9 @@ WIN_REASON_CHOICES = [
 ]
 
 
-# ==========================================
-# 3. FOOTBALL: THE MATCH OBJECT
-# ==========================================
+
+#  FOOTBALL: THE MATCH OBJECT
+
 class FootballMatch(models.Model):
     """
     The actual 1v1 game. Handles both Group matches and Knockout brackets.
@@ -209,9 +206,9 @@ class FootballMatch(models.Model):
         return f"{self.round_name}: {self.player_1} vs {self.player_2}"
 
 
-# ==========================================
-# 4. BATTLE ROYALE: THE MATCH OBJECT
-# ==========================================
+
+#  BATTLE ROYALE: THE MATCH OBJECT
+
 class BattleRoyaleMatch(models.Model):
     tournament = models.ForeignKey('Tournament', on_delete=models.CASCADE, related_name='br_matches')
     match_number = models.IntegerField(default=1) 
@@ -261,9 +258,9 @@ class BattleRoyaleMatch(models.Model):
         return f"{self.tournament.title} - Match #{self.match_number}"
     
 
-# ==========================================
-# 5. BATTLE ROYALE: RESULT SHEET
-# ==========================================
+
+#  BATTLE ROYALE: RESULT SHEET
+
 class BattleRoyaleResult(models.Model):
     match = models.ForeignKey(BattleRoyaleMatch, on_delete=models.CASCADE, related_name='results')
     participant = models.ForeignKey('Participant', on_delete=models.CASCADE, related_name='br_results')
@@ -289,3 +286,71 @@ class BattleRoyaleResult(models.Model):
 
     def __str__(self):
         return f"{self.participant.user.username} | Rank: {self.rank} | Kills: {self.kills}"
+
+
+
+
+
+
+
+class PointsRaceStanding(models.Model):
+    participant = models.OneToOneField(
+        Participant, 
+        on_delete=models.CASCADE, 
+        related_name='points_race_stats'
+    )
+    total_points = models.IntegerField(default=0)
+    matches_played = models.IntegerField(default=0)
+    wins = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.participant.user.username} | {self.total_points} pts"
+
+
+class PointsRaceMatch(models.Model):
+    tournament = models.ForeignKey(
+        'Tournament', 
+        on_delete=models.CASCADE, 
+        related_name='points_race_matches'
+    )
+    match_number = models.IntegerField(default=1)
+    
+    player_1 = models.ForeignKey(
+        'Participant', 
+        related_name='pr_matches_as_p1', 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL
+    )
+    player_2 = models.ForeignKey(
+        'Participant', 
+        related_name='pr_matches_as_p2', 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL
+    )
+    
+    p1_score = models.IntegerField(default=0)
+    p2_score = models.IntegerField(default=0)
+    winner = models.ForeignKey(
+        'Participant', 
+        related_name='pr_matches_won', 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL
+    )
+    
+    player_1_proof = models.ImageField(upload_to='points_race/proof', null=True, blank=True)
+    player_2_proof = models.ImageField(upload_to='points_race/proof', null=True, blank=True)
+    
+    status = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES, default='PENDING')
+    is_completed = models.BooleanField(default=False)
+    scheduled_time = models.DateTimeField(null=True, blank=True)
+    admin_notes = models.TextField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        self.is_completed = (self.status == 'COMPLETED')
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.tournament.title} - Match #{self.match_number}: {self.player_1} vs {self.player_2}"
