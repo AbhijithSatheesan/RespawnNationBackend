@@ -12,6 +12,8 @@ from .models import Stream, Games
 from .serializers import StreamOwnerSerializer, StreamUpdateSerializer, StreamPublicSerializer
 from django.db.models import Q
 
+from tournaments.models import Tournament
+
 
 
 # view for going live 

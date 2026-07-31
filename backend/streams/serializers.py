@@ -8,14 +8,36 @@ class StreamPublicSerializer(serializers.ModelSerializer):
     hls_url = serializers.ReadOnlyField()
     streamer_name = serializers.CharField(source='user.username', read_only=True)
     game_name = serializers.CharField(source='game.name', read_only=True)
+    
+    # NEW: Resolve the thumbnail dynamically
+    display_thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = Stream
         fields = [
             'id', 'title', 'description', 'is_live', 
             'playback_id', 'hls_url', 'streamer_name', 'game_name',
-            'stream_type', 'external_url' # NEW: Expose platform info to React
+            'stream_type', 'external_url', 
+            'display_thumbnail' # <-- Add it to fields
         ]
+
+    def get_display_thumbnail(self, obj):
+        request = self.context.get('request')
+        url = None
+
+        # 1. Check if the stream has a custom thumbnail
+        if obj.thumbnail:
+            url = obj.thumbnail.url
+        # 2. Fallback: check if a game exists AND has a promo background
+        elif obj.game and obj.game.promo_background:
+            url = obj.game.promo_background.url
+            
+        # 3. If a valid URL is found, return the absolute URI for React
+        if url and request:
+            return request.build_absolute_uri(url)
+            
+        # 4. If neither exists, return None (React will use streamcover.png)
+        return None
 
 # 2. What the creator sees (Dashboard)
 class StreamOwnerSerializer(serializers.ModelSerializer):

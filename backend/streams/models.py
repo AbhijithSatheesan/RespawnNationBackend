@@ -49,6 +49,12 @@ class Stream(models.Model):
     stream_key = models.CharField(max_length=255, blank=True, null=True)
     playback_id = models.CharField(max_length=100, blank=True, null=True)
 
+
+    thumbnail = models.ImageField(upload_to='streams/thumbnails/', null=True, blank=True)
+
+    stream_type = models.CharField(max_length=20, choices=STREAM_TYPES, default='CLOUDFLARE')
+
+
     is_live = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -60,3 +66,15 @@ class Stream(models.Model):
         if self.stream_type == 'CLOUDFLARE' and self.playback_id:
             return f"https://videodelivery.net/{self.playback_id}/manifest/video.m3u8"
         return self.external_url
+
+
+
+
+
+# Past broadcast
+
+# class PastBroadcast(models.Model):
+#     user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     title = models.CharField(max_length=100)
+#     playback_id = models.CharField(max_length=100)
+#     recorded_at = models.DateTimeField(auto_now_add=True)
