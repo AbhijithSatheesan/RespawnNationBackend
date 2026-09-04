@@ -10,31 +10,43 @@ import random
 from .models import Games, GameCategory
 from .serializers import GamesSerializer,GameCardSerializer, GameSerializer
 
+from django.core.cache import cache
+import logging
 
 
 # Create your views here.
+
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
 @authentication_classes([]) 
 @permission_classes([AllowAny])
 def browse_games(request):
+    cache_key = "browse_games_feed"
 
-    # 1. Limit to 8 games per row (Perfect for horizontal scrolling)
+    # 1. Check Redis cache
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        logger.info(f"⚡ SERVED FROM REDIS: {cache_key}")
+        print(f"⚡ SERVED FROM REDIS: {cache_key}")
+        return Response(cached_data)
+
+    # 2. Cache Miss: Query PostgreSQL
+    logger.info(f"🐢 DB FETCH (CACHE MISS): {cache_key}")
+
     trending_category = get_object_or_404(GameCategory, name="Trending")
     trending_games = trending_category.games.all()[:20]
 
     top_rated_category = get_object_or_404(GameCategory, name='Top Rated')
     top_rated_games = top_rated_category.games.all()[:20]
 
-    # 2. Limit to only 4 main categories to prevent endless scrolling
     main_categories = GameCategory.objects.filter(main_category=True)[:5]
     category_games = {}
 
     for category in main_categories:
-        # 3. Limit to 8 games per category
         games_in_category = category.games.all()[:8]
-        # Only add the category if it actually has games in it!
         if games_in_category.exists():
             category_games[category.name] = GameCardSerializer(games_in_category, many=True).data
 
@@ -44,9 +56,10 @@ def browse_games(request):
         "Main_category": category_games,
     }
 
+    # 3. Store in Redis for 10 minutes (600 seconds)
+    cache.set(cache_key, data, timeout=600)
+
     return Response(data)
-
-
 
 
 

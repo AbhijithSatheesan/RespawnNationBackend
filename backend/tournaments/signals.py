@@ -1,7 +1,10 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from .models import  Tournament,FootballMatch, FootballStanding
 from chat.models import ChatRoom
+from django.core.cache import cache
+
+
 
 
 @receiver(post_save, sender= FootballMatch) # when ever a save occurs in FootballMatch models, this function gets called
@@ -99,4 +102,14 @@ def create_tournament_chatroom(sender, instance, created, **kwargs):
             tournament = instance,
             is_private = True    # we should only allow participants
         )
-        
+
+
+
+# Caching (redis)
+
+
+
+@receiver([post_save, post_delete], sender=Tournament)
+def invalidate_tournament_list_cache(sender, instance, **kwargs):
+    """Clears all cached tournament list keys on any tournament change."""
+    cache.delete_pattern("tournaments_list_*")

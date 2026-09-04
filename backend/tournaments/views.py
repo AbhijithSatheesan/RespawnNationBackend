@@ -16,17 +16,22 @@ from .serializers import TournamentSerializer, TournamentDetailSerializer
 from accounts.models import UserProfile, WalletTransaction
 from .engines.factory import get_tournament_engine
 
+from django.core.cache import cache
+import logging
 
-# 1. Create a custom Pagination class for your Tournaments
 class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 10 # Fetch 10 at a time
+    page_size = 10
     page_size_query_param = 'page_size'
     max_page_size = 50
+
+
+logger = logging.getLogger(__name__)
+
 
 class TournamentListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = TournamentSerializer
-    pagination_class = StandardResultsSetPagination # 2. Tell the view to use it
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         queryset = Tournament.objects.all()
@@ -35,9 +40,34 @@ class TournamentListView(generics.ListAPIView):
         if requested_status:
             queryset = queryset.filter(status=requested_status)
 
-        # 3. Just order them, the pagination class will handle the slicing automatically!
         return queryset.order_by('registration_deadline')
-    
+
+    def list(self, request, *args, **kwargs):
+        requested_status = request.query_params.get('status', 'all')
+        page = request.query_params.get('page', '1')
+        page_size = request.query_params.get('page_size', '10')
+
+        cache_key = f"tournaments_list_status_{requested_status}_page_{page}_ps_{page_size}"
+
+        # 1. Check Redis cache
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            # Output log to terminal / Render stdout
+            logger.info(f"⚡ SERVED FROM REDIS: {cache_key}")
+            print(f"⚡ SERVED FROM REDIS: {cache_key}")  # Instant terminal confirmation
+            return Response(cached_data)
+
+        # 2. Cache Miss: Query PostgreSQL
+        logger.info(f"🐢 DB FETCH (CACHE MISS): {cache_key}")
+        response = super().list(request, *args, **kwargs)
+
+        # 3. Store in Redis for 5 minutes
+        cache.set(cache_key, response.data, timeout=300)
+
+        return response
+
+
+        
 
 class TournamentDetailView(generics.RetrieveAPIView):
     queryset = Tournament.objects.all()
