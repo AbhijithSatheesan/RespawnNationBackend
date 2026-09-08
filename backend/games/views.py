@@ -35,6 +35,7 @@ def browse_games(request):
 
     # 2. Cache Miss: Query PostgreSQL
     logger.info(f"🐢 DB FETCH (CACHE MISS): {cache_key}")
+    print("Cache miss")
 
     trending_category = get_object_or_404(GameCategory, name="Trending")
     trending_games = trending_category.games.all()[:20]
@@ -56,8 +57,8 @@ def browse_games(request):
         "Main_category": category_games,
     }
 
-    # 3. Store in Redis for 10 minutes (600 seconds)
-    cache.set(cache_key, data, timeout=600)
+    # 3. Store in Redis for 2 hours (7200 seconds)
+    cache.set(cache_key, data, timeout=7200)
 
     return Response(data)
 

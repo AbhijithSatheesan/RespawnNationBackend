@@ -54,15 +54,16 @@ class TournamentListView(generics.ListAPIView):
         if cached_data is not None:
             # Output log to terminal / Render stdout
             logger.info(f"⚡ SERVED FROM REDIS: {cache_key}")
-            print(f"⚡ SERVED FROM REDIS: {cache_key}")  # Instant terminal confirmation
+            print(f"⚡ SERVED FROM REDIS: {cache_key}")  # So we can see it is served from terminal
             return Response(cached_data)
 
         # 2. Cache Miss: Query PostgreSQL
         logger.info(f"🐢 DB FETCH (CACHE MISS): {cache_key}")
+        print("Cache miss")
         response = super().list(request, *args, **kwargs)
 
         # 3. Store in Redis for 5 minutes
-        cache.set(cache_key, response.data, timeout=300)
+        cache.set(cache_key, response.data, timeout=1000)
 
         return response
 

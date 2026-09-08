@@ -43,7 +43,13 @@ RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')
 
 
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '.onrender.com',
+    'respawnnation.site',
+    'www.respawnnation.site',
+]
 
 
 # Redis cache
@@ -147,12 +153,16 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloudflare-workers-autoconfig-respawnnation.abhijithms7306.workers.dev",
     "https://respawn-nation-js.vercel.app",
     "https://respawnnation.pages.dev",
+    "https://respawnnation.site",
+    "https://www.respawnnation.site"
 ]
 
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",  # Your JS Frontend
     "http://localhost:5174",  # Your TS Frontend
+    "https://respawnnation.site",
+    "https://www.respawnnation.site",
 ]
 
 
@@ -232,7 +242,7 @@ else:
 # DOMAIN = 'localhost:5173'         # React frontend's address
 # SITE_NAME = 'Respawn Nation'
     
-DOMAIN = 'respawnnation.pages.dev'         # React frontend's address
+DOMAIN = 'respawnnation.site'
 SITE_NAME = 'Respawn Nation'
 
 # --- DJOSER CONFIGURATION ---
