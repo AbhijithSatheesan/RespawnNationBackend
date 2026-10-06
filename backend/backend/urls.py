@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/streams/', include('streams.urls')),
     path('api/tournaments/',include('tournaments.urls')),
     path('api/chat/', include('chat.urls')),
+    path('api/ai/', include('ai_assistant.urls')),
 
     path('api/auth/', include(router.urls)),
     path('api/auth/', include('djoser.urls.jwt')),

@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     'streams',
     'tournaments',
     'chat',
+    'ai_assistant',
 ]
 
 
