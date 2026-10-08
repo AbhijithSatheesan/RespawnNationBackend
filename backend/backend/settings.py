@@ -113,8 +113,8 @@ REST_FRAMEWORK = {
 ## Token expiry time
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours= 6),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=20),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes = 1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours = 2),
 
     # The rest may remain default
 }
